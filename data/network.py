@@ -80,7 +80,7 @@ class UserNetwork:
 
 class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
-    def __init__(self, config_file_path, event_path_list, user_set: set):
+    def __init__(self, config_file_path, event_path_list, user_set: set, sec_to_wait: int=60):
         """
         Attributes
         ----------
@@ -92,6 +92,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
         self.user_set: set = user_set
         self.error_user_set: set = set()
+        self.sec_to_wait = sec_to_wait
 
         # user IDs for every user following the specified user.
         self.user_id_to_follower_ids: dict = dict()
@@ -157,7 +158,6 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
     def paged_to_all(self, user_id, paged_func) -> list:
 
         all_list = []
-        sec_to_wait = 60
         next_cursor = -1
 
         while True:
@@ -168,7 +168,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             print('Fetched user({0})\'s {1} of {2}, Stopped: {3}'.format(
                 user_id, len(all_list), paged_func.__name__, fetch_stop
             ))
-            wait_second(sec_to_wait)
+            wait_second(self.sec_to_wait)
 
             if fetch_stop:
                 break
@@ -180,6 +180,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             return self.paged_to_all(user_id, self._fetch_follower_ids_paged)
         except Exception as e:
             print(colored('Error in follower ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
+            wait_second(self.sec_to_wait)
             return None
 
     def _fetch_friend_ids(self, user_id) -> list or None:
@@ -187,6 +188,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             return self.paged_to_all(user_id, self._fetch_friend_ids_paged)
         except Exception as e:
             print(colored('Error in friend ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
+            wait_second(self.sec_to_wait)
             return None
 
     def _fetch_follower_ids_paged(self, user_id, cursor=-1) -> (int, int, list):
