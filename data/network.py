@@ -143,7 +143,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
                 if not target_ids:
                     self.error_user_set.add(user_id)
 
-            if i != 0 and i % save_point == 0:
+            if (i + 1) % save_point == 0:
                 self._dump_user_network()
 
     def get_user_id_to_follower_ids(self, save_point=10):
