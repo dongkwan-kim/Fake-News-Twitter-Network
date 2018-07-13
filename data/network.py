@@ -37,15 +37,20 @@ class UserNetwork:
         self.user_set: set = user_set
         self.error_user_set: set = error_user_set
 
+    def print_info(self, prefix: str, file_name: str, color: str):
+        print(colored('{0}: {1} with {2} users, {3} crawled users, {4} error users.'.format(
+            prefix,
+            file_name,
+            len(self.user_set),
+            max(len(self.user_id_to_friend_ids.keys()), len(self.user_id_to_follower_ids.keys())),
+            len(self.error_user_set)
+        ), color))
+
     def dump(self):
         file_name = 'UserNetwork.pkl'
         with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
-        print(colored('Dumped: {0} with {1} users, {2} error users.'.format(
-            file_name,
-            len(max(self.user_id_to_friend_ids.keys(), self.user_id_to_follower_ids.keys())),
-            len(self.error_user_set),
-        ), 'blue'))
+        self.print_info('Dumped', file_name, 'blue')
 
     def load(self):
         file_name = 'UserNetwork.pkl'
@@ -56,12 +61,10 @@ class UserNetwork:
                 self.user_id_to_friend_ids = loaded.user_id_to_friend_ids
                 self.user_set = loaded.user_set
                 self.error_user_set = loaded.error_user_set
-            print(colored('Loaded: {0} with {1} users and {2} error users.'.format(
-                file_name, len(self.user_set), len(self.error_user_set)
-            ), 'green'))
+            self.print_info('Loaded', file_name, 'green')
             return True
-        except:
-            print('Load Failed: {0}.\n'.format(file_name),
+        except Exception as e:
+            print('Load Failed: {0}.\n'.format(file_name), str(e), '\n',
                   'If you want to get UserNetwork, please refer UserNetworkAPIWrapper')
             return False
 
