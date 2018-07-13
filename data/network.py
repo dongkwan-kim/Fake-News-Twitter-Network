@@ -6,9 +6,9 @@ __author__ = 'Dongkwan Kim'
 from TwitterAPIWrapper import TwitterAPIWrapper
 from format_event import *
 from format_story import *
-from tqdm import tqdm
 from pprint import pprint
 from termcolor import colored
+from utill.utill import *
 import os
 import time
 import pickle
@@ -18,12 +18,6 @@ DATA_PATH = './'
 EVENT_PATH = os.path.join(DATA_PATH, 'event')
 STORY_PATH = os.path.join(DATA_PATH, 'story')
 NETWORK_PATH = os.path.join(DATA_PATH, 'network')
-
-
-def wait_second(sec=60):
-    time.sleep(1)
-    for _ in tqdm(range(sec)):
-        time.sleep(1)
 
 
 def get_event_files():
