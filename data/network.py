@@ -8,6 +8,7 @@ from format_event import *
 from format_story import *
 from tqdm import tqdm
 from pprint import pprint
+from termcolor import colored
 import os
 import time
 import pickle
@@ -46,11 +47,11 @@ class UserNetwork:
         file_name = 'UserNetwork.pkl'
         with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
-        print('Dumped: {0} with {1} users, {2} error users.'.format(
+        print(colored('Dumped: {0} with {1} users, {2} error users.'.format(
             file_name,
             len(max(self.user_id_to_friend_ids.keys(), self.user_id_to_follower_ids.keys())),
             len(self.error_user_set),
-        ))
+        ), 'blue'))
 
     def load(self):
         file_name = 'UserNetwork.pkl'
@@ -61,7 +62,9 @@ class UserNetwork:
                 self.user_id_to_friend_ids = loaded.user_id_to_friend_ids
                 self.user_set = loaded.user_set
                 self.error_user_set = loaded.error_user_set
-            print('Loaded: {0}'.format(file_name))
+            print(colored('Loaded: {0} with {1} users and {2} error users.'.format(
+                file_name, len(self.user_set), len(self.error_user_set)
+            ), 'green'))
             return True
         except:
             print('Load Failed: {0}.\n'.format(file_name),
@@ -96,9 +99,9 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         # user IDs for every user the specified user is following (otherwise known as their “friends”).
         self.user_id_to_friend_ids: dict = dict()
 
-        print('UserNetworkAPI initialized with {0} users {1} ROOT'.format(
+        print(colored('UserNetworkAPI initialized with {0} users {1} ROOT'.format(
             len(self.user_set), 'with' if 'ROOT' in user_set else 'without',
-        ))
+        ), 'green'))
 
     def _dump_user_network(self):
         user_network_for_dumping = UserNetwork(
@@ -176,14 +179,14 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         try:
             return self.paged_to_all(user_id, self._fetch_follower_ids_paged)
         except Exception as e:
-            print('Error in follower ids: {0}'.format(user_id), e)
+            print(colored('Error in follower ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
             return None
 
     def _fetch_friend_ids(self, user_id) -> list or None:
         try:
             return self.paged_to_all(user_id, self._fetch_friend_ids_paged)
         except Exception as e:
-            print('Error in friend ids: {0}'.format(user_id), e)
+            print(colored('Error in friend ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
             return None
 
     def _fetch_follower_ids_paged(self, user_id, cursor=-1) -> (int, int, list):
