@@ -10,8 +10,8 @@ from termcolor import colored
 from utill.utill import *
 from typing import List
 from multiprocessing import Process
-from random import randrange
 import os
+import shutil
 import time
 import pickle
 
@@ -39,7 +39,7 @@ class UserNetwork:
             prefix,
             file_name,
             len(self.user_set),
-            max(len(self.user_id_to_friend_ids.keys()), len(self.user_id_to_follower_ids.keys())),
+            self.get_num_of_crawled_users(),
             len(self.error_user_set),
             self.dump_file_id if self.dump_file_id else os.getpid(),
         ), color))
@@ -52,8 +52,7 @@ class UserNetwork:
         self.print_info('Dumped', file_name, 'blue')
 
     def load(self, file_name: str=None):
-        # If file_name is not give, load merged file.
-        # This will be start line for every call.
+        # If file_name is not given, load merged file.
         file_name = file_name or 'UserNetwork.pkl'
         try:
             with open(os.path.join(NETWORK_PATH, file_name), 'rb') as f:
@@ -75,6 +74,9 @@ class UserNetwork:
 
     def get_friend_ids(self, user_id):
         return self.user_id_to_friend_ids[user_id]
+
+    def get_num_of_crawled_users(self) -> int:
+        return max(len(self.user_id_to_friend_ids.keys()), len(self.user_id_to_follower_ids.keys()))
 
 
 class UserNetworkAPIWrapper(TwitterAPIWrapper):
@@ -124,10 +126,10 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self.error_user_set = loaded_user_network.error_user_set
 
     def get_and_dump_user_network(self, with_load=True):
-        first_wait = 2
+        first_wait = 5
         print('Just called get_and_dump_user_network(), which is a really heavy method.\n',
               'This will start after {0}s.'.format(first_wait))
-        wait_second(first_wait, with_tqdm=True)
+        wait_second(first_wait)
 
         if with_load:
             self._load_user_network()
@@ -277,6 +279,15 @@ class MultiprocessUserNetworkAPIWrapper:
         merged_network = self.load_and_merge_user_networks(partial_user_network_file_list)
         merged_network.dump()
 
+        # Backup merged file
+        new_dir = 'backup_c{0}_e{1}'.format(
+            merged_network.get_num_of_crawled_users(),
+            len(merged_network.error_user_set)
+        )
+        os.mkdir(os.path.join(NETWORK_PATH, new_dir))
+        shutil.copyfile(os.path.join(NETWORK_PATH, 'UserNetwork.pkl'),
+                        os.path.join(NETWORK_PATH, new_dir, 'UserNetwork.pkl'))
+
         sec_to_clean = 5
         print(colored('Partial files will be removed in {0} secs'.format(sec_to_clean), 'red', 'on_yellow'))
         wait_second(sec_to_clean, with_tqdm=True)
@@ -317,9 +328,9 @@ if __name__ == '__main__':
         multiprocess_user_network_api = MultiprocessUserNetworkAPIWrapper(
             config_file_path_list=given_config_file_path_list,
             user_set=user_set_from_fe,
-            max_process=3,
+            max_process=6,
         )
-        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=6)
+        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=6*30)
 
     else:
         user_network = UserNetwork()
