@@ -167,8 +167,8 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             all_list += partial_list
 
             fetch_stop = next_cursor == 0 or next_cursor == prev_cursor
-            print('Fetched user({0})\'s {1} of {2}, Stopped: {3}'.format(
-                user_id, len(all_list), paged_func.__name__, fetch_stop
+            print('{0} | Fetched user({1})\'s {2} of {3}, Stopped: {4}'.format(
+                os.getpid(), user_id, len(all_list), paged_func.__name__, fetch_stop
             ))
             wait_second(self.sec_to_wait)
 
@@ -181,7 +181,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         try:
             return self.paged_to_all(user_id, self._fetch_follower_ids_paged)
         except Exception as e:
-            print(colored('Error in follower ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
+            print('{0} |'.format(os.getpid()), colored('Error in follower ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
             wait_second(self.sec_to_wait)
             return None
 
@@ -189,7 +189,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         try:
             return self.paged_to_all(user_id, self._fetch_friend_ids_paged)
         except Exception as e:
-            print(colored('Error in friend ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
+            print('{0} |'.format(os.getpid()), colored('Error in friend ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
             wait_second(self.sec_to_wait)
             return None
 
