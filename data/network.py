@@ -6,7 +6,7 @@ __author__ = 'Dongkwan Kim'
 from TwitterAPIWrapper import TwitterAPIWrapper
 from format_event import *
 from format_story import *
-from termcolor import colored
+from termcolor import colored, cprint
 from utill.utill import *
 from typing import List
 from multiprocessing import Process
@@ -142,6 +142,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
     def get_user_id_to_target_ids(self, user_id_to_target_ids, fetch_target_ids, save_point=10):
         # user_id: str
+        len_user_set = len(self.user_set)
         for i, user_id in enumerate(self.user_set):
 
             if user_id != 'ROOT' and user_id not in user_id_to_target_ids and user_id not in self.error_user_set:
@@ -152,6 +153,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
             if (i + 1) % save_point == 0:
                 self._dump_user_network()
+                print('{0} | {1}/{2} finished.'.format(os.getpid(), i, len_user_set))
 
     def get_user_id_to_follower_ids(self, save_point=10):
         self.get_user_id_to_target_ids(self.user_id_to_follower_ids, self._fetch_follower_ids, save_point)
@@ -224,6 +226,7 @@ class MultiprocessUserNetworkAPIWrapper:
     def get_and_dump_user_network(self, single_user_network_api: UserNetworkAPIWrapper, with_load: bool=None):
         single_user_network_api.dump_file_id = os.getpid()
         single_user_network_api.get_and_dump_user_network(with_load)
+        cprint('{0} | get_and_dump_user_network finished'.format(os.getpid()), 'blue')
 
     def load_and_merge_user_networks(self, user_network_file_list: List[str]):
         main_network = UserNetwork(
@@ -294,6 +297,7 @@ class MultiprocessUserNetworkAPIWrapper:
         for partial_network in partial_user_network_file_list:
             os.remove(os.path.join(NETWORK_PATH, partial_network))
 
+        wait_second(1)
         print(colored('{0} finished get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
             self.__class__.__name__, num_process,
         ), 'blue'))
@@ -302,6 +306,7 @@ class MultiprocessUserNetworkAPIWrapper:
 if __name__ == '__main__':
 
     MODE = 'MP_API_RUN'
+    start_time = time.time()
 
     user_set_from_fe = None
     if 'API_RUN' in MODE:
@@ -324,16 +329,23 @@ if __name__ == '__main__':
         user_network_api.get_and_dump_user_network()
 
     elif MODE == 'MP_API_RUN':
-        given_config_file_path_list = [os.path.join('.', 'config', f) for f in os.listdir('./config') if '.ini' in f]
+        given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
         multiprocess_user_network_api = MultiprocessUserNetworkAPIWrapper(
             config_file_path_list=given_config_file_path_list,
             user_set=user_set_from_fe,
             max_process=6,
         )
-        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=6*30)
+        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=6*120)
 
     else:
         user_network = UserNetwork()
         user_network.load()
         print('Total {0} users.'.format(len(user_network.user_id_to_friend_ids)))
         print('Total {0} error users.'.format(len(user_network.error_user_set)))
+
+    total_consumed_secs = time.time() - start_time
+    print('Total {0}h {1}m {2}s consumed'.format(
+        int(total_consumed_secs // 3600),
+        int(total_consumed_secs // 60 % 60),
+        int(total_consumed_secs % 60),
+    ))

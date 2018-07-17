@@ -3,7 +3,7 @@ from tqdm import tqdm
 from typing import List
 
 
-def wait_second(sec=60, with_tqdm=False):
+def wait_second(sec: int or float=60, with_tqdm=False):
     time.sleep(1)
     if with_tqdm:
         for _ in tqdm(range(sec)):
