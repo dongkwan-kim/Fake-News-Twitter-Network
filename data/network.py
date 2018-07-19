@@ -2,7 +2,6 @@
 
 __author__ = 'Dongkwan Kim'
 
-
 from TwitterAPIWrapper import TwitterAPIWrapper
 from format_event import *
 from format_story import *
@@ -15,15 +14,15 @@ import shutil
 import time
 import pickle
 
-
 DATA_PATH = './'
 NETWORK_PATH = os.path.join(DATA_PATH, 'network')
 
 
 class UserNetwork:
 
-    def __init__(self, dump_file_id: int=None, user_id_to_follower_ids: dict=None, user_id_to_friend_ids: dict=None,
-                 user_set: set=None, error_user_set: set=None):
+    def __init__(self, dump_file_id: int = None,
+                 user_id_to_follower_ids: dict = None, user_id_to_friend_ids: dict = None,
+                 user_set: set = None, error_user_set: set = None):
         """
         :param user_id_to_follower_ids: collection of user IDs for every user following the key-user.
         :param user_id_to_friend_ids: collection of user IDs for every user the key-user is following.
@@ -51,7 +50,7 @@ class UserNetwork:
             pickle.dump(self, f)
         self.print_info('Dumped', file_name, 'blue')
 
-    def load(self, file_name: str=None):
+    def load(self, file_name: str = None):
         # If file_name is not given, load merged file.
         file_name = file_name or 'UserNetwork.pkl'
         try:
@@ -81,7 +80,7 @@ class UserNetwork:
 
 class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
-    def __init__(self, config_file_path: str, user_set: set, dump_file_id: int=None, sec_to_wait: int=60):
+    def __init__(self, config_file_path: str, user_set: set, dump_file_id: int = None, sec_to_wait: int = 60):
         """
         Attributes
         ----------
@@ -153,7 +152,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
             if (i + 1) % save_point == 0:
                 self._dump_user_network()
-                print('{0} | {1}/{2} finished.'.format(os.getpid(), i, len_user_set))
+                print('{0} | {1}/{2} finished.'.format(os.getpid(), i + 1, len_user_set))
 
     def get_user_id_to_follower_ids(self, save_point=10):
         self.get_user_id_to_target_ids(self.user_id_to_follower_ids, self._fetch_follower_ids, save_point)
@@ -185,7 +184,8 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         try:
             return self.paged_to_all(user_id, self._fetch_follower_ids_paged)
         except Exception as e:
-            print('{0} |'.format(os.getpid()), colored('Error in follower ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
+            print('{0} |'.format(os.getpid()),
+                  colored('Error in follower ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
             wait_second(self.sec_to_wait)
             return None
 
@@ -193,7 +193,8 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         try:
             return self.paged_to_all(user_id, self._fetch_friend_ids_paged)
         except Exception as e:
-            print('{0} |'.format(os.getpid()), colored('Error in friend ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
+            print('{0} |'.format(os.getpid()),
+                  colored('Error in friend ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
             wait_second(self.sec_to_wait)
             return None
 
@@ -216,14 +217,14 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
 class MultiprocessUserNetworkAPIWrapper:
 
-    def __init__(self, config_file_path_list: List[str], user_set: set, max_process: int, sec_to_wait: int=60):
+    def __init__(self, config_file_path_list: List[str], user_set: set, max_process: int, sec_to_wait: int = 60):
 
         self.config_file_path_list = config_file_path_list
         self.user_set = user_set
         self.max_process = max_process
         self.sec_to_wait = sec_to_wait
 
-    def get_and_dump_user_network(self, single_user_network_api: UserNetworkAPIWrapper, with_load: bool=None):
+    def get_and_dump_user_network(self, single_user_network_api: UserNetworkAPIWrapper, with_load: bool = None):
         single_user_network_api.dump_file_id = os.getpid()
         single_user_network_api.get_and_dump_user_network(with_load)
         cprint('{0} | get_and_dump_user_network finished'.format(os.getpid()), 'blue')
@@ -247,7 +248,7 @@ class MultiprocessUserNetworkAPIWrapper:
 
         return main_network
 
-    def get_and_dump_user_network_with_multiprocess(self, goal: int=None, with_load: bool=True):
+    def get_and_dump_user_network_with_multiprocess(self, goal: int = None, with_load: bool = True):
         num_process = min(self.max_process, len(self.config_file_path_list))
         print(colored('{0} called get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
             self.__class__.__name__, num_process,
@@ -258,7 +259,6 @@ class MultiprocessUserNetworkAPIWrapper:
         user_set_sliced_by_goal = set(list(self.user_set)[:goal]) if goal else self.user_set
         for config_file_path, partial_set in zip(self.config_file_path_list,
                                                  slice_set_by_segment(user_set_sliced_by_goal, num_process)):
-
             # dump file id will be assigned at get_and_dump_user_network()
             single_user_network_api = UserNetworkAPIWrapper(
                 config_file_path=config_file_path,
@@ -329,13 +329,14 @@ if __name__ == '__main__':
         user_network_api.get_and_dump_user_network()
 
     elif MODE == 'MP_API_RUN':
+        max_process = 19
         given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
         multiprocess_user_network_api = MultiprocessUserNetworkAPIWrapper(
             config_file_path_list=given_config_file_path_list,
             user_set=user_set_from_fe,
-            max_process=6,
+            max_process=max_process,
         )
-        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=6*120)
+        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 6)
 
     else:
         user_network = UserNetwork()
