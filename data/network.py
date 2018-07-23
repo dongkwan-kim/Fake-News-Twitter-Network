@@ -8,7 +8,7 @@ from format_story import *
 from termcolor import colored, cprint
 from utill.utill import *
 from typing import List
-from multiprocessing import Process
+from multiprocessing import Process, current_process
 import os
 import shutil
 import time
@@ -124,6 +124,10 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self.user_id_to_follower_ids = loaded_user_network.user_id_to_follower_ids
             self.error_user_set = loaded_user_network.error_user_set
 
+        if current_process().name != 'MainProcess':
+            self.user_id_to_friend_ids = {k: [] for k in self.user_id_to_friend_ids.keys()}
+            self.user_id_to_follower_ids = {k: [] for k in self.user_id_to_follower_ids.keys()}
+
     def get_and_dump_user_network(self, with_load=True):
         first_wait = 5
         print('Just called get_and_dump_user_network(), which is a really heavy method.\n',
@@ -237,12 +241,15 @@ class MultiprocessUserNetworkAPIWrapper:
             user_set=set(),
             error_user_set=set(),
         )
+        main_network.load()
 
         for partial_network_file in user_network_file_list:
             loaded_partial_network = UserNetwork()
             if loaded_partial_network.load(partial_network_file):
-                main_network.user_id_to_follower_ids.update(loaded_partial_network.user_id_to_follower_ids)
-                main_network.user_id_to_friend_ids.update(loaded_partial_network.user_id_to_friend_ids)
+                main_network.user_id_to_follower_ids = merge_dicts(main_network.user_id_to_follower_ids,
+                                                                   loaded_partial_network.user_id_to_follower_ids)
+                main_network.user_id_to_friend_ids = merge_dicts(main_network.user_id_to_friend_ids,
+                                                                 loaded_partial_network.user_id_to_friend_ids)
                 main_network.error_user_set.update(loaded_partial_network.error_user_set)
                 main_network.user_set.update(loaded_partial_network.user_set)
 
@@ -273,6 +280,7 @@ class MultiprocessUserNetworkAPIWrapper:
             process = Process(target=self.get_and_dump_user_network, args=(single_user_network_api, with_load))
             process.start()
             process_list.append(process)
+            wait_second(15)
 
         # Wait for other processes.
         for process in process_list:

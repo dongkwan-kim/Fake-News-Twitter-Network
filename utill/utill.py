@@ -1,6 +1,13 @@
 import time
 from tqdm import tqdm
 from typing import List
+from copy import deepcopy
+
+
+def merge_dicts(high_priority_dict: dict, low_priority_dict: dict):
+    copied: dict = deepcopy(low_priority_dict)
+    copied.update(high_priority_dict)
+    return copied
 
 
 def wait_second(sec: int or float=60, with_tqdm=False):
@@ -32,5 +39,4 @@ def slice_set_by_size(given_set: set, sz: int) -> List[set]:
 
 
 if __name__ == '__main__':
-    print(slice_set_by_segment({1, 2, 3, 4, 5, 6}, 3))
-    print(slice_set_by_size({1, 2, 3, 4, 5, 6}, 3))
+    print(merge_dicts({1: 1, 2: 2}, {2: -1, 3: 3}))
