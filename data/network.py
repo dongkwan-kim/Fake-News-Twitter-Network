@@ -263,7 +263,13 @@ class MultiprocessUserNetworkAPIWrapper:
 
         process_list: List[Process] = []
 
-        user_set_sliced_by_goal = set(list(self.user_set)[:goal]) if goal else self.user_set
+        existing_user_network = UserNetwork()
+        existing_user_network.load()
+        # For now, we only consider user_id_to_friends_ids.
+        user_list_need_crawling = [u for u in self.user_set
+                                   if u not in existing_user_network.user_id_to_friend_ids]
+
+        user_set_sliced_by_goal = set(user_list_need_crawling[:goal]) if goal else self.user_set
         for config_file_path, partial_set in zip(self.config_file_path_list,
                                                  slice_set_by_segment(user_set_sliced_by_goal, num_process)):
             # dump file id will be assigned at get_and_dump_user_network()
