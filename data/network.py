@@ -43,9 +43,9 @@ class UserNetwork:
             self.dump_file_id if self.dump_file_id else os.getpid(),
         ), color))
 
-    def dump(self):
+    def dump(self, file_name: str = None):
         dump_file_id_str = ('_' + str(self.dump_file_id)) if self.dump_file_id else ''
-        file_name = 'UserNetwork{0}.pkl'.format(dump_file_id_str)
+        file_name = file_name or 'UserNetwork{0}.pkl'.format(dump_file_id_str)
         with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
         self.print_info('Dumped', file_name, 'blue')
@@ -104,7 +104,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             config_file_path, len(self.user_set), 'with' if 'ROOT' in user_set else 'without',
         ), 'green'))
 
-    def _dump_user_network(self):
+    def _dump_user_network(self, file_name: str = None):
         user_network_for_dumping = UserNetwork(
             self.dump_file_id,
             self.user_id_to_follower_ids,
@@ -112,13 +112,13 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self.user_set,
             self.error_user_set,
         )
-        user_network_for_dumping.dump()
+        user_network_for_dumping.dump(file_name)
         return user_network_for_dumping
 
-    def _load_user_network(self):
+    def _load_user_network(self, file_name: str = None):
         time.sleep(0.5)
         loaded_user_network = UserNetwork()
-        if loaded_user_network.load():
+        if loaded_user_network.load(file_name):
             # DO NOT Load 'dump_file_id' and 'user_set'.
             self.user_id_to_friend_ids = loaded_user_network.user_id_to_friend_ids
             self.user_id_to_follower_ids = loaded_user_network.user_id_to_follower_ids
@@ -128,20 +128,20 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self.user_id_to_friend_ids = {k: [] for k in self.user_id_to_friend_ids.keys()}
             self.user_id_to_follower_ids = {k: [] for k in self.user_id_to_follower_ids.keys()}
 
-    def get_and_dump_user_network(self, with_load=True):
+    def get_and_dump_user_network(self, file_name: str = None, with_load=True):
         first_wait = 5
         print('Just called get_and_dump_user_network(), which is a really heavy method.\n',
               'This will start after {0}s.'.format(first_wait))
         wait_second(first_wait)
 
         if with_load:
-            self._load_user_network()
+            self._load_user_network(file_name)
 
         # We are not using self.get_user_id_to_follower_ids() for now.
         self.get_user_id_to_friend_ids()
 
         time.sleep(1)
-        return self._dump_user_network()
+        return self._dump_user_network(file_name)
 
     def get_user_id_to_target_ids(self, user_id_to_target_ids, fetch_target_ids, save_point=10):
         # user_id: str
@@ -233,7 +233,7 @@ class MultiprocessUserNetworkAPIWrapper:
         single_user_network_api.get_and_dump_user_network(with_load)
         cprint('{0} | get_and_dump_user_network finished'.format(os.getpid()), 'blue')
 
-    def load_and_merge_user_networks(self, user_network_file_list: List[str]):
+    def load_and_merge_user_networks(self, user_network_file_list: List[str], file_name: str = None):
         main_network = UserNetwork(
             dump_file_id=None,
             user_id_to_follower_ids=dict(),
@@ -241,7 +241,7 @@ class MultiprocessUserNetworkAPIWrapper:
             user_set=set(),
             error_user_set=set(),
         )
-        main_network.load()
+        main_network.load(file_name)
 
         for partial_network_file in user_network_file_list:
             loaded_partial_network = UserNetwork()
@@ -255,7 +255,7 @@ class MultiprocessUserNetworkAPIWrapper:
 
         return main_network
 
-    def get_and_dump_user_network_with_multiprocess(self, goal: int = None, with_load: bool = True):
+    def get_and_dump_user_network_with_multiprocess(self, goal: int = None, file_name: str = None, with_load: bool = True):
         num_process = min(self.max_process, len(self.config_file_path_list))
         print(colored('{0} called get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
             self.__class__.__name__, num_process,
@@ -294,7 +294,7 @@ class MultiprocessUserNetworkAPIWrapper:
 
         partial_user_network_file_list = ['UserNetwork{0}.pkl'.format('_' + str(p.pid)) for p in process_list]
         merged_network = self.load_and_merge_user_networks(partial_user_network_file_list)
-        merged_network.dump()
+        merged_network.dump(file_name)
 
         # Backup merged file
         new_dir = 'backup_c{0}_e{1}'.format(
@@ -319,7 +319,7 @@ class MultiprocessUserNetworkAPIWrapper:
 
 if __name__ == '__main__':
 
-    MODE = 'API_TEST'
+    MODE = 'MP_API_RUN'
     start_time = time.time()
 
     user_set_from_fe = None
@@ -333,7 +333,7 @@ if __name__ == '__main__':
             config_file_path='./config/config_01.ini',
             user_set={'836322793', '318956466', '2567151784', '1337170682', '3374714687', '47353139', '23196051'},
         )
-        user_network_api.get_and_dump_user_network()
+        user_network_api.get_and_dump_user_network('UserNetwork_test.pkl')
 
     elif MODE == 'API_RUN':
         user_network_api = UserNetworkAPIWrapper(
