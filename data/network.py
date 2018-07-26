@@ -319,7 +319,7 @@ class MultiprocessUserNetworkAPIWrapper:
 
 if __name__ == '__main__':
 
-    MODE = 'MP_API_RUN'
+    MODE = 'API_TEST'
     start_time = time.time()
 
     user_set_from_fe = None
@@ -330,14 +330,14 @@ if __name__ == '__main__':
 
     if MODE == 'API_TEST':
         user_network_api = UserNetworkAPIWrapper(
-            config_file_path='./config/config_1.ini',
+            config_file_path='./config/config_01.ini',
             user_set={'836322793', '318956466', '2567151784', '1337170682', '3374714687', '47353139', '23196051'},
         )
         user_network_api.get_and_dump_user_network()
 
     elif MODE == 'API_RUN':
         user_network_api = UserNetworkAPIWrapper(
-            config_file_path='./config/config_1.ini',
+            config_file_path='./config/config_01.ini',
             user_set=user_set_from_fe,
         )
         user_network_api.get_and_dump_user_network()
