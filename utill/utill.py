@@ -1,7 +1,64 @@
 import time
+import os
+import re
+import urllib.request
+import sys
 from tqdm import tqdm
 from typing import List
 from copy import deepcopy
+
+
+def try_except(f):
+    """
+    :param f: function that use this decorator
+    :return:
+    """
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            print('P{0} | Error: {1}'.format(os.getpid(), f.__name__), e, file=sys.stderr)
+            return None
+
+    return wrapper
+
+
+@try_except
+def get_twitter_id(account_name: str) -> int or None:
+    url = 'http://gettwitterid.com/?user_name={}'.format(account_name)
+    request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    response = urllib.request.urlopen(request)
+    flag = False
+    for line in response:
+        line = line.decode('utf-8')
+
+        if flag and '<p>' in line:
+            twitter_id = clean_html(line)
+            return int(twitter_id)
+
+        if 'Twitter User ID' in line:
+            flag = True
+
+    return None
+
+
+def clean_html(raw_html):
+    clean_regex = re.compile('<.*?>')
+    clean_text = re.sub(clean_regex, '', raw_html)
+    return clean_text.strip()
+
+
+def get_attribute_of_html(html: str):
+    regex = re.compile('(\w+)="(.+?)"')
+    return regex.findall(html)
+
+
+def get_files(path: str, search_text: str = None) -> list:
+    return [f for f in os.listdir(path) if (not search_text) or (search_text in f)]
+
+
+def get_files_with_dir_path(path: str, search_text: str = None) -> list:
+    return [os.path.join(path, f) for f in get_files(path, search_text)]
 
 
 def merge_dicts(high_priority_dict: dict, low_priority_dict: dict):
@@ -39,4 +96,8 @@ def slice_set_by_size(given_set: set, sz: int) -> List[set]:
 
 
 if __name__ == '__main__':
-    print(merge_dicts({1: 1, 2: 2}, {2: -1, 3: 3}))
+    print(get_attribute_of_html('<a href="/nytimeses" title="NYTimes en Español"'))
+    print(get_attribute_of_html('<a>'))
+
+    test_id = get_twitter_id('jack')
+    print(test_id, test_id == 12)
