@@ -17,3 +17,8 @@ class WriterWrapper:
 
     def close(self):
         self.f.close()
+
+    def export(self, lines):
+        for line in lines:
+            self.write_row(line)
+        self.close()

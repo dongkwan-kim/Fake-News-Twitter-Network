@@ -2,10 +2,11 @@ from utill import get_twitter_id, get_files_with_dir_path
 from WriterWrapper import WriterWrapper
 from time import sleep
 from network import UserNetwork
-from typing import List
-from collections import defaultdict
+from typing import List, Dict, Tuple
+from termcolor import cprint, colored
 import os
 import csv
+import pickle
 
 
 DATA_PATH = './'
@@ -22,13 +23,11 @@ def add_user_id(path: str):
         print(' | '.join([line_dict['domain'], line_dict['twitter_accounts'], str(line_dict[new_field])]))
         sleep(0.3)
 
-    writer = WriterWrapper(
+    _writer = WriterWrapper(
         os.path.join(MEDIA_PATH, 'reviewed_media_alignment_with_twitter_id'),
         media_alignment_reader.fieldnames + [new_field]
     )
-    for line in new_lines:
-        writer.write_row(line)
-    writer.close()
+    _writer.export(new_lines)
 
 
 class Media:
@@ -43,10 +42,10 @@ class Media:
 
 class MediaList:
 
-    def __init__(self, media_path: str):
+    def __init__(self, media_file: str):
 
         self.media_list: List[Media] = []
-        reader = csv.DictReader(open(media_path, 'r', encoding='utf-8'))
+        reader = csv.DictReader(open(media_file, 'r', encoding='utf-8'))
         for line_dict in reader:
             self.media_list.append(Media(line_dict))
 
@@ -86,44 +85,77 @@ class MediaList:
         return None
 
 
-def get_user_ideology(user_network_file: str, media_path: str):
+class UserAlignment:
 
-    user_network = UserNetwork()
-    user_network.load(user_network_file)
+    def __init__(self, user_network_file: str, media_file: str, file_name_to_load_and_dump: str = None):
 
-    media_list = MediaList(media_path)
+        if self.load(file_name_to_load_and_dump):
+            return
 
-    _user_ideologies = dict()
-    for user, user_friend_list in user_network.user_id_to_friend_ids.items():
+        user_network = UserNetwork()
+        user_network.load(user_network_file)
 
-        if not user_friend_list:
-            continue
+        media_list = MediaList(media_file)
 
-        media_that_friend_follow = []
-        for friend in user_friend_list:
+        self.user_to_alignment: Dict[str, float or None] = dict()
+        self.user_to_following_media: Dict[str, List[Tuple[int, float]]] = dict()
+        for user, user_friend_list in user_network.user_id_to_friend_ids.items():
 
-            media_align = media_list.get_avg_align(friend)
-            if media_align:
-                media_that_friend_follow.append(media_align)
+            if not user_friend_list:
+                continue
 
-        if media_that_friend_follow:
-            _user_ideologies[user] = sum(media_that_friend_follow) / len(media_that_friend_follow)
-        else:
-            _user_ideologies[user] = None
+            media_that_friend_follow = []
+            for friend in user_friend_list:
+                media_align = media_list.get_avg_align(friend)
+                if media_align:
+                    media_that_friend_follow.append((friend, media_align))
 
-    return _user_ideologies
+            self.user_to_following_media[user] = media_that_friend_follow
+            if media_that_friend_follow:
+                self.user_to_alignment[user] = sum([media_align for friend, media_align in media_that_friend_follow]) \
+                                              / len(media_that_friend_follow)
+            else:
+                self.user_to_alignment[user] = None
+
+    def dump(self, file_name: str = None):
+        file_name = file_name or 'UserAlignment.pkl'
+        with open(os.path.join(MEDIA_PATH, file_name), 'wb') as f:
+            pickle.dump(self, f)
+        cprint('Dumped: {0}'.format(file_name), 'blue')
+
+    def load(self, file_name: str = None):
+        file_name = file_name or 'UserAlignment.pkl'
+        try:
+            with open(os.path.join(MEDIA_PATH, file_name), 'rb') as f:
+                loaded: UserAlignment = pickle.load(f)
+                self.user_to_alignment = loaded.user_to_alignment
+                self.user_to_following_media = loaded.user_to_following_media
+            return True
+        except Exception as e:
+            print(colored('Load Failed: {0}.\n'.format(file_name), 'red'), str(e))
+            return False
 
 
 if __name__ == '__main__':
 
-    MODE = 'TEST_GET_USER_IDEOLOGY'
+    MODE = 'TEST_GET_USER_ALIGNMENT'
 
     if MODE == 'ADD_USER_ID':
-        add_user_id(get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment')[0])
+        add_user_id(get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment_in_twitter')[0])
 
-    elif MODE == 'TEST_GET_USER_IDEOLOGY':
-        user_ideologies = get_user_ideology(
-            'UserNetwork_test.pkl',
-            get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment_with_twitter_id')[0]
+    elif MODE == 'TEST_GET_USER_ALIGNMENT':
+        user_alignment = UserAlignment(
+            user_network_file='UserNetwork_test.pkl',
+            media_file=get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
+            file_name_to_load_and_dump='UserAlignment_test.pkl',
         )
-        print(user_ideologies)
+        print(user_alignment.user_to_following_media)
+        print(user_alignment.user_to_alignment)
+
+    elif MODE == 'FULL_GET_USER_ALIGNMENT':
+        user_alignment = UserAlignment(
+            user_network_file='UserNetwork.pkl',
+            media_file=get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
+            file_name_to_load_and_dump='UserAlignment.pkl',
+        )
+        user_alignment.dump()
