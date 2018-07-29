@@ -6,7 +6,7 @@ from TwitterAPIWrapper import TwitterAPIWrapper
 from format_event import *
 from format_story import *
 from termcolor import colored, cprint
-from utill.utill import *
+from utill import *
 from typing import List
 from multiprocessing import Process, current_process
 import os
