@@ -15,7 +15,7 @@ import time
 import pickle
 
 DATA_PATH = './'
-NETWORK_PATH = os.path.join(DATA_PATH, 'network')
+NETWORK_PATH = os.path.join(DATA_PATH, 'data_network')
 
 
 class UserNetwork:

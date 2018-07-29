@@ -6,7 +6,7 @@ import csv
 
 
 DATA_PATH = './'
-MEDIA_PATH = os.path.join(DATA_PATH, 'media')
+MEDIA_PATH = os.path.join(DATA_PATH, 'data_media')
 
 
 def add_user_id(path: str):

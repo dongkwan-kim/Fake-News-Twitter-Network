@@ -5,7 +5,7 @@ import os
 import pprint
 import pickle
 
-EVENT_PATH = './event'
+EVENT_PATH = './data_event'
 
 
 def get_event_files():

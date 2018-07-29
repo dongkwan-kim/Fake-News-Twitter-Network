@@ -15,7 +15,7 @@ except:
     pass
 
 DATA_PATH = './'
-STORY_PATH = os.path.join(DATA_PATH, 'story')
+STORY_PATH = os.path.join(DATA_PATH, 'data_story')
 
 
 def get_stops():
