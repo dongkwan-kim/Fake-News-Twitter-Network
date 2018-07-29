@@ -10,7 +10,7 @@ import pickle
 
 
 DATA_PATH = './'
-MEDIA_PATH = os.path.join(DATA_PATH, 'data_media')
+ALIGNMENT_PATH = os.path.join(DATA_PATH, 'data_alignment')
 
 
 def add_user_id(path: str):
@@ -24,7 +24,7 @@ def add_user_id(path: str):
         sleep(0.3)
 
     _writer = WriterWrapper(
-        os.path.join(MEDIA_PATH, 'reviewed_media_alignment_with_twitter_id'),
+        os.path.join(ALIGNMENT_PATH, 'reviewed_media_alignment_with_twitter_id'),
         media_alignment_reader.fieldnames + [new_field]
     )
     _writer.export(new_lines)
@@ -119,14 +119,14 @@ class UserAlignment:
 
     def dump(self, file_name: str = None):
         file_name = file_name or 'UserAlignment.pkl'
-        with open(os.path.join(MEDIA_PATH, file_name), 'wb') as f:
+        with open(os.path.join(ALIGNMENT_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
         cprint('Dumped: {0}'.format(file_name), 'blue')
 
     def load(self, file_name: str = None):
         file_name = file_name or 'UserAlignment.pkl'
         try:
-            with open(os.path.join(MEDIA_PATH, file_name), 'rb') as f:
+            with open(os.path.join(ALIGNMENT_PATH, file_name), 'rb') as f:
                 loaded: UserAlignment = pickle.load(f)
                 self.user_to_alignment = loaded.user_to_alignment
                 self.user_to_following_media = loaded.user_to_following_media
@@ -141,12 +141,12 @@ if __name__ == '__main__':
     MODE = 'TEST_GET_USER_ALIGNMENT'
 
     if MODE == 'ADD_USER_ID':
-        add_user_id(get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment_in_twitter')[0])
+        add_user_id(get_files_with_dir_path(ALIGNMENT_PATH, 'reviewed_media_alignment_in_twitter')[0])
 
     elif MODE == 'TEST_GET_USER_ALIGNMENT':
         user_alignment = UserAlignment(
             user_network_file='UserNetwork_test.pkl',
-            media_file=get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
+            media_file=get_files_with_dir_path(ALIGNMENT_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
             file_name_to_load_and_dump='UserAlignment_test.pkl',
         )
         print(user_alignment.user_to_following_media)
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     elif MODE == 'FULL_GET_USER_ALIGNMENT':
         user_alignment = UserAlignment(
             user_network_file='UserNetwork.pkl',
-            media_file=get_files_with_dir_path(MEDIA_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
+            media_file=get_files_with_dir_path(ALIGNMENT_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
             file_name_to_load_and_dump='UserAlignment.pkl',
         )
         user_alignment.dump()

@@ -1,4 +1,4 @@
-# data/data_media
+# data/data_alignment
 
 ## media_alignment(Original Bakshy et al.)
 - Refer to [Bakshy, Eytan, Solomon Messing, and Lada A. Adamic. "Exposure to ideologically diverse news and opinion on Facebook." Science 348.6239 (2015): 1130-1132.](http://science.sciencemag.org/content/348/6239/1130)
