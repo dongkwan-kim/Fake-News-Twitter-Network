@@ -89,6 +89,7 @@ class UserAlignment:
 
     def __init__(self, user_network_file: str, media_file: str, file_name_to_load_and_dump: str = None):
 
+        self.file_name_to_load_and_dump = file_name_to_load_and_dump
         if self.load(file_name_to_load_and_dump):
             return
 
@@ -118,18 +119,20 @@ class UserAlignment:
                 self.user_to_alignment[user] = None
 
     def dump(self, file_name: str = None):
-        file_name = file_name or 'UserAlignment.pkl'
+        file_name = file_name or self.file_name_to_load_and_dump or 'UserAlignment.pkl'
         with open(os.path.join(ALIGNMENT_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
         cprint('Dumped: {0}'.format(file_name), 'blue')
 
     def load(self, file_name: str = None):
-        file_name = file_name or 'UserAlignment.pkl'
+        file_name = file_name or self.file_name_to_load_and_dump or 'UserAlignment.pkl'
         try:
             with open(os.path.join(ALIGNMENT_PATH, file_name), 'rb') as f:
                 loaded: UserAlignment = pickle.load(f)
                 self.user_to_alignment = loaded.user_to_alignment
                 self.user_to_following_media = loaded.user_to_following_media
+                self.file_name_to_load_and_dump = loaded.file_name_to_load_and_dump
+            cprint('Load: {0}'.format(file_name), 'green')
             return True
         except Exception as e:
             print(colored('Load Failed: {0}.\n'.format(file_name), 'red'), str(e))
@@ -149,6 +152,7 @@ if __name__ == '__main__':
             media_file=get_files_with_dir_path(ALIGNMENT_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
             file_name_to_load_and_dump='UserAlignment_test.pkl',
         )
+        user_alignment.dump()
         print(user_alignment.user_to_following_media)
         print(user_alignment.user_to_alignment)
 
