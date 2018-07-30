@@ -40,20 +40,20 @@ class Media:
         return getattr(self, k)
 
 
-class MediaList:
+class MediaDict:
 
     def __init__(self, media_file: str):
 
-        self.media_list: List[Media] = []
+        self.media_dict: Dict[str, Media] = dict()
         reader = csv.DictReader(open(media_file, 'r', encoding='utf-8'))
         for line_dict in reader:
-            self.media_list.append(Media(line_dict))
+            self.media_dict[str(line_dict['user_id'])] = Media(line_dict)
 
     def __len__(self):
-        return len(self.media_list)
+        return len(self.media_dict)
 
     def __getitem__(self, item) -> Media:
-        return self.media_list[item]
+        return self.media_dict[item]
 
     def __iter__(self):
         self.index = 0
@@ -62,9 +62,9 @@ class MediaList:
     def __next__(self):
         if self.index >= len(self):
             raise StopIteration
-        n = self.media_list[self.index]
+        k = list(self.media_dict.keys())[self.index]
         self.index += 1
-        return n
+        return k
 
     def get_avg_align(self, some_key: str or int) -> float or None:
 
@@ -78,9 +78,16 @@ class MediaList:
         else:
             raise Exception('Unknown Type: {}'.format(some_key))
 
-        for o in self:
-            if str(o.get(key_to_compare)) == str(some_key):
-                return float(o.get('avg_align'))
+        if key_to_compare == 'user_id':
+            try:
+                return float(self[str(some_key)].get('avg_align'))
+            except Exception:
+                return None
+        else:
+            for k in self:
+                o = self[k]
+                if str(o.get(key_to_compare)) == str(some_key):
+                    return float(o.get('avg_align'))
 
         return None
 
@@ -96,7 +103,7 @@ class UserAlignment:
         user_network = UserNetwork()
         user_network.load(user_network_file)
 
-        media_list = MediaList(media_file)
+        media_dict = MediaDict(media_file)
 
         self.user_to_alignment: Dict[str, float or None] = dict()
         self.user_to_following_media: Dict[str, List[Tuple[int, float]]] = dict()
@@ -108,7 +115,7 @@ class UserAlignment:
 
             media_that_friend_follow = []
             for friend in user_friend_list:
-                media_align = media_list.get_avg_align(friend)
+                media_align = media_dict.get_avg_align(friend)
                 if media_align:
                     media_that_friend_follow.append((friend, media_align))
 
@@ -119,7 +126,7 @@ class UserAlignment:
             else:
                 self.user_to_alignment[user] = None
 
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 print('Initialize {}, {}/{}'.format(self.__class__.__name__, str(i+1), str(len_to_iterate)))
 
     def dump(self, file_name: str = None):
