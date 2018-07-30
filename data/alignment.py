@@ -100,7 +100,8 @@ class UserAlignment:
 
         self.user_to_alignment: Dict[str, float or None] = dict()
         self.user_to_following_media: Dict[str, List[Tuple[int, float]]] = dict()
-        for user, user_friend_list in user_network.user_id_to_friend_ids.items():
+        len_to_iterate = len(user_network.user_id_to_friend_ids)
+        for i, (user, user_friend_list) in enumerate(user_network.user_id_to_friend_ids.items()):
 
             if not user_friend_list:
                 continue
@@ -117,6 +118,9 @@ class UserAlignment:
                                               / len(media_that_friend_follow)
             else:
                 self.user_to_alignment[user] = None
+
+            if i % 100 == 0:
+                print('Initialize {}, {}/{}'.format(self.__class__.__name__, str(i+1), str(len_to_iterate)))
 
     def dump(self, file_name: str = None):
         file_name = file_name or self.file_name_to_load_and_dump or 'UserAlignment.pkl'
@@ -141,7 +145,7 @@ class UserAlignment:
 
 if __name__ == '__main__':
 
-    MODE = 'TEST_GET_USER_ALIGNMENT'
+    MODE = 'FULL_GET_USER_ALIGNMENT'
 
     if MODE == 'ADD_USER_ID':
         add_user_id(get_files_with_dir_path(ALIGNMENT_PATH, 'reviewed_media_alignment_in_twitter')[0])
