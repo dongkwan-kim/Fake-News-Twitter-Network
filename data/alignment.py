@@ -1,9 +1,10 @@
-from utill import get_twitter_id, get_files_with_dir_path
+from utill import get_twitter_id, get_files_with_dir_path, build_hist
 from WriterWrapper import WriterWrapper
 from time import sleep
 from network import UserNetwork
 from typing import List, Dict, Tuple
 from termcolor import cprint, colored
+from collections import Counter
 import os
 import csv
 import pickle
@@ -149,10 +150,32 @@ class UserAlignment:
             print(colored('Load Failed: {0}.\n'.format(file_name), 'red'), str(e))
             return False
 
+    def print_stats(self):
+        liberal_user, conservative_user, non_exist_user = [], [], []
+        alignments = []
+        for user, alignment in self.user_to_alignment.items():
+
+            if alignment:
+                alignments.append(alignment)
+
+            if alignment and alignment < 0:
+                liberal_user.append(user)
+            elif alignment and alignment > 0:
+                conservative_user.append(user)
+            elif alignment:
+                print(user, alignment)
+            else:
+                non_exist_user.append(user)
+        print('Liberal: {}, Conservative: {}, Non exist user: {}'.format(
+            len(liberal_user), len(conservative_user), len(non_exist_user),
+        ))
+        print('Alignment_avg: {}'.format(sum(alignments)/len(alignments)))
+        build_hist(alignments, 'user_alignments', {'bins': 100})
+
 
 if __name__ == '__main__':
 
-    MODE = 'FULL_GET_USER_ALIGNMENT'
+    MODE = 'STATS_USER_ALIGNMENT'
 
     if MODE == 'ADD_USER_ID':
         add_user_id(get_files_with_dir_path(ALIGNMENT_PATH, 'reviewed_media_alignment_in_twitter')[0])
@@ -174,3 +197,12 @@ if __name__ == '__main__':
             file_name_to_load_and_dump='UserAlignment.pkl',
         )
         user_alignment.dump()
+
+    elif MODE == 'STATS_USER_ALIGNMENT':
+        user_alignment = UserAlignment(
+            user_network_file='UserNetwork.pkl',
+            media_file=get_files_with_dir_path(ALIGNMENT_PATH, 'reviewed_media_alignment_with_twitter_id')[0],
+            file_name_to_load_and_dump='UserAlignment.pkl',
+        )
+        user_alignment.dump()
+        user_alignment.print_stats()

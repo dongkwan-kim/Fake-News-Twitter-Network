@@ -3,9 +3,26 @@ import os
 import re
 import urllib.request
 import sys
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from typing import List
 from copy import deepcopy
+
+
+def build_hist(enumerable, title, config):
+    _bins = 80 if 'bins' not in config else config['bins']
+    _range = None if 'range' not in config else config['range']
+
+    n, bins, patches = plt.hist(
+        list(enumerable),
+        bins=_bins,
+        range=_range,
+    )
+    plt.title('{0}'.format(title))
+    plt.grid(True)
+    plt.show()
+
+    return n, bins, patches
 
 
 def try_except(f):
