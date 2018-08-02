@@ -97,7 +97,7 @@ def slice_set_by_segment(given_set: set, sg: int) -> List[set]:
     """
     :param given_set: e.g. {1, 2, 3, 4, 5, 6}
     :param sg: e.g. 3
-    :return: e.g. [{1, 2, 3}, {4, 5, 6}]
+    :return: e.g. [{1, 2}, {3, 4}, {5, 6}]
     """
     return slice_set_by_size(given_set, int(len(given_set)/sg))
 
