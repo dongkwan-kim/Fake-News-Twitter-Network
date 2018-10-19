@@ -137,8 +137,8 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         if with_load:
             self._load_user_network(file_name)
 
-        # We are not using self.get_user_id_to_follower_ids() for now.
-        self.get_user_id_to_friend_ids()
+        self.get_user_id_to_follower_ids()
+        # self.get_user_id_to_friend_ids()
 
         time.sleep(1)
         return self._dump_user_network(file_name)
@@ -228,9 +228,10 @@ class MultiprocessUserNetworkAPIWrapper:
         self.max_process = max_process
         self.sec_to_wait = sec_to_wait
 
-    def get_and_dump_user_network(self, single_user_network_api: UserNetworkAPIWrapper, with_load: bool = None):
+    def get_and_dump_user_network(self, single_user_network_api: UserNetworkAPIWrapper,
+                                  file_name: str = None, with_load: bool = None):
         single_user_network_api.dump_file_id = os.getpid()
-        single_user_network_api.get_and_dump_user_network(with_load)
+        single_user_network_api.get_and_dump_user_network(file_name=file_name, with_load=with_load)
         cprint('{0} | get_and_dump_user_network finished'.format(os.getpid()), 'blue')
 
     def load_and_merge_user_networks(self, user_network_file_list: List[str], file_name: str = None):
@@ -265,9 +266,10 @@ class MultiprocessUserNetworkAPIWrapper:
 
         existing_user_network = UserNetwork()
         existing_user_network.load()
-        # For now, we only consider user_id_to_friends_ids.
+
+        # For now, we only consider user_id_to_X.
         user_list_need_crawling = [u for u in self.user_set
-                                   if u not in existing_user_network.user_id_to_friend_ids]
+                                   if u not in existing_user_network.user_id_to_follower_ids]
 
         user_set_sliced_by_goal = set(user_list_need_crawling[:goal]) if goal else self.user_set
         for config_file_path, partial_set in zip(self.config_file_path_list,
@@ -283,7 +285,8 @@ class MultiprocessUserNetworkAPIWrapper:
             # I do not know why this line is necessary, but it is. So do not remove it.
             single_user_network_api.verify_credentials()
 
-            process = Process(target=self.get_and_dump_user_network, args=(single_user_network_api, with_load))
+            process = Process(target=self.get_and_dump_user_network,
+                              args=(single_user_network_api, file_name, with_load))
             process.start()
             process_list.append(process)
             wait_second(15)
@@ -350,12 +353,12 @@ if __name__ == '__main__':
             user_set=user_set_from_fe,
             max_process=max_process,
         )
-        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 6)
+        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 48)
 
     else:
         user_network = UserNetwork()
         user_network.load()
-        print('Total {0} users.'.format(len(user_network.user_id_to_friend_ids)))
+        print('Total {0} users.'.format(len(user_network.user_id_to_follower_ids)))
         print('Total {0} error users.'.format(len(user_network.error_user_set)))
 
     total_consumed_secs = time.time() - start_time
