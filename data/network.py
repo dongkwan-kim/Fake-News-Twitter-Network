@@ -295,7 +295,23 @@ class MultiprocessUserNetworkAPIWrapper:
         for process in process_list:
             process.join()
 
-        partial_user_network_file_list = ['UserNetwork{0}.pkl'.format('_' + str(p.pid)) for p in process_list]
+        self.merge_partial_files_of_processes(file_name, process_list)
+
+        wait_second(1)
+        print(colored('{0} finished get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
+            self.__class__.__name__, num_process,
+        ), 'blue'))
+
+    def merge_partial_files_of_processes(self, file_name: str = None, process_list: list = None):
+        if process_list:
+            partial_user_network_file_list = ['UserNetwork{0}.pkl'.format('_' + str(p.pid)) for p in process_list]
+        else:
+            process_file_pattern = re.compile("UserNetwork_[\d+]")
+            partial_user_network_file_list = [f for f in os.listdir(NETWORK_PATH) if process_file_pattern.match(f)]
+            print("Find {} partial files".format(len(partial_user_network_file_list)))
+            if len(partial_user_network_file_list) == 0:
+                return
+
         merged_network = self.load_and_merge_user_networks(partial_user_network_file_list)
         merged_network.dump(file_name)
 
@@ -314,15 +330,10 @@ class MultiprocessUserNetworkAPIWrapper:
         for partial_network in partial_user_network_file_list:
             os.remove(os.path.join(NETWORK_PATH, partial_network))
 
-        wait_second(1)
-        print(colored('{0} finished get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
-            self.__class__.__name__, num_process,
-        ), 'blue'))
-
 
 if __name__ == '__main__':
 
-    MODE = 'MP_API_RUN'
+    MODE = 'MERGE_FILES'
     start_time = time.time()
 
     user_set_from_fe = None
@@ -353,7 +364,15 @@ if __name__ == '__main__':
             user_set=user_set_from_fe,
             max_process=max_process,
         )
-        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 48)
+        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 1)
+
+    elif MODE == 'MERGE_FILES':
+        multiprocess_user_network_api = MultiprocessUserNetworkAPIWrapper(
+            config_file_path_list=[],
+            user_set=user_set_from_fe,
+            max_process=0,
+        )
+        multiprocess_user_network_api.merge_partial_files_of_processes()
 
     else:
         user_network = UserNetwork()
