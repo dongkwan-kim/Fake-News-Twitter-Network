@@ -256,7 +256,7 @@ class MultiprocessUserNetworkAPIWrapper:
 
         return main_network
 
-    def get_and_dump_user_network_with_multiprocess(self, goal: int = None, file_name: str = None, with_load: bool = True):
+    def get_and_dump_user_network_with_multiprocess(self, goal: int = None, file_name: str = None):
         num_process = min(self.max_process, len(self.config_file_path_list))
         print(colored('{0} called get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
             self.__class__.__name__, num_process,
@@ -286,7 +286,7 @@ class MultiprocessUserNetworkAPIWrapper:
             single_user_network_api.verify_credentials()
 
             process = Process(target=self.get_and_dump_user_network,
-                              args=(single_user_network_api, file_name, with_load))
+                              args=(single_user_network_api, file_name, False))
             process.start()
             process_list.append(process)
             wait_second(15)
@@ -333,7 +333,7 @@ class MultiprocessUserNetworkAPIWrapper:
 
 if __name__ == '__main__':
 
-    MODE = 'MERGE_FILES'
+    MODE = 'MP_API_RUN'
     start_time = time.time()
 
     user_set_from_fe = None
