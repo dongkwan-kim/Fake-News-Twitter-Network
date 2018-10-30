@@ -79,6 +79,10 @@ def get_files_with_dir_path(path: str, search_text: str = None) -> list:
 
 
 def merge_dicts(high_priority_dict: dict, low_priority_dict: dict):
+    if high_priority_dict is None:
+        return None
+    elif low_priority_dict is None:
+        return high_priority_dict
     copied: dict = deepcopy(low_priority_dict)
     copied.update(high_priority_dict)
     return copied

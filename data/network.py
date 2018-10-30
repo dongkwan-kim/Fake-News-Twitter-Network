@@ -28,10 +28,10 @@ class UserNetwork:
         :param user_id_to_friend_ids: collection of user IDs for every user the key-user is following.
         """
         self.dump_file_id = dump_file_id
-        self.user_id_to_follower_ids: dict = user_id_to_follower_ids
-        self.user_id_to_friend_ids: dict = user_id_to_friend_ids
-        self.user_set: set = user_set
-        self.error_user_set: set = error_user_set
+        self.user_id_to_follower_ids: dict = user_id_to_follower_ids or dict()
+        self.user_id_to_friend_ids: dict = user_id_to_friend_ids or dict()
+        self.user_set: set = user_set or set()
+        self.error_user_set: set = error_user_set or set()
 
     def print_info(self, prefix: str, file_name: str, color: str):
         print(colored('{5} | {0}: {1} with {2} users, {3} crawled users, {4} error users.'.format(
@@ -43,24 +43,49 @@ class UserNetwork:
             self.dump_file_id if self.dump_file_id else os.getpid(),
         ), color))
 
-    def dump(self, file_name: str = None):
-        dump_file_id_str = ('_' + str(self.dump_file_id)) if self.dump_file_id else ''
-        file_name = file_name or 'UserNetwork{0}.pkl'.format(dump_file_id_str)
+    def _sliced_dump(self, slice_id: int):
+        file_name = "SlicedUserNetwork_{0}.pkl".format(str(slice_id))
         with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
+
+    def dump(self, file_name: str = None, file_slice: int = 10):
+        dump_file_id_str = ('_' + str(self.dump_file_id)) if self.dump_file_id else ''
+        file_name = file_name or 'UserNetwork{0}.pkl'.format(dump_file_id_str)
+        if not self.dump_file_id:
+            for slice_idx in range(file_slice):
+                sliced_network = UserNetwork(
+                    dump_file_id=None,
+                    user_id_to_friend_ids={k: v for i, (k, v) in enumerate(self.user_id_to_friend_ids.items()) if i % file_slice == slice_idx},
+                    user_id_to_follower_ids={k: v for i, (k, v) in enumerate(self.user_id_to_follower_ids.items()) if i % file_slice == slice_idx},
+                    user_set={u for i, u in enumerate(self.user_set) if i % file_slice == slice_idx},
+                    error_user_set={u for i, u in enumerate(self.error_user_set) if i % file_slice == slice_idx},
+                )
+                sliced_network._sliced_dump(slice_idx)
+            file_name = "SlicedUserNetwork_*.pkl"
+        else:
+            with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
+                pickle.dump(self, f)
         self.print_info('Dumped', file_name, 'blue')
 
+    def _sliced_load(self, file_name: str):
+        with open(os.path.join(NETWORK_PATH, file_name), 'rb') as f:
+            loaded: UserNetwork = pickle.load(f)
+            self.dump_file_id = loaded.dump_file_id
+            self.user_id_to_follower_ids = merge_dicts(self.user_id_to_follower_ids, loaded.user_id_to_follower_ids)
+            self.user_id_to_friend_ids = merge_dicts(self.user_id_to_friend_ids, loaded.user_id_to_friend_ids)
+            self.user_set.update(loaded.user_set)
+            self.error_user_set.update(loaded.error_user_set)
+
     def load(self, file_name: str = None):
-        # If file_name is not given, load merged file.
-        file_name = file_name or 'UserNetwork.pkl'
         try:
-            with open(os.path.join(NETWORK_PATH, file_name), 'rb') as f:
-                loaded: UserNetwork = pickle.load(f)
-                self.dump_file_id = loaded.dump_file_id
-                self.user_id_to_follower_ids = loaded.user_id_to_follower_ids
-                self.user_id_to_friend_ids = loaded.user_id_to_friend_ids
-                self.user_set = loaded.user_set
-                self.error_user_set = loaded.error_user_set
+            if not file_name:
+                file_name = "UserNetwork.pkl"
+                target_file_list = [f for f in os.listdir(NETWORK_PATH)
+                                    if "SlicedUserNetwork" in f or "UserNetwork.pkl" in f]
+                for network_file in target_file_list:
+                    self._sliced_load(network_file)
+            else:
+                self._sliced_load(file_name)
             self.print_info('Loaded', file_name, 'green')
             return True
         except Exception as e:
@@ -321,8 +346,11 @@ class MultiprocessUserNetworkAPIWrapper:
             len(merged_network.error_user_set)
         )
         os.mkdir(os.path.join(NETWORK_PATH, new_dir))
-        shutil.copyfile(os.path.join(NETWORK_PATH, 'UserNetwork.pkl'),
-                        os.path.join(NETWORK_PATH, new_dir, 'UserNetwork.pkl'))
+        target_file_list = [f for f in os.listdir(NETWORK_PATH)
+                            if "SlicedUserNetwork" in f or "UserNetwork.pkl" in f]
+        for target_file in target_file_list:
+            shutil.copyfile(os.path.join(NETWORK_PATH, target_file),
+                            os.path.join(NETWORK_PATH, new_dir, target_file))
 
         sec_to_clean = 5
         print(colored('Partial files will be removed in {0} secs'.format(sec_to_clean), 'red', 'on_yellow'))
@@ -364,7 +392,7 @@ if __name__ == '__main__':
             user_set=user_set_from_fe,
             max_process=max_process,
         )
-        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 1)
+        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 24)
 
     elif MODE == 'MERGE_FILES':
         multiprocess_user_network_api = MultiprocessUserNetworkAPIWrapper(
