@@ -7,7 +7,7 @@ from format_event import *
 from format_story import *
 from termcolor import colored, cprint
 from utill import *
-from typing import List
+from typing import List, Dict
 from multiprocessing import Process, current_process
 import os
 import shutil
@@ -359,6 +359,87 @@ class MultiprocessUserNetworkAPIWrapper:
             os.remove(os.path.join(NETWORK_PATH, partial_network))
 
 
+class UserNetworkChecker:
+
+    def __init__(self, config_file_path_list, file_name: str = None, load: bool = True):
+
+        self.config_file_path_list = config_file_path_list
+        self.api_list: List[TwitterAPIWrapper] = []
+        for config_file_path in config_file_path_list:
+            self.api_list.append(TwitterAPIWrapper(config_file_path))
+
+        self.network = UserNetwork()
+        if load:
+            self.network.load(file_name)
+
+    def is_account_public_for_one(self, api: TwitterAPIWrapper, user_id):
+        try:
+            u = api.api.GetUser(user_id=user_id)
+            protected = u.protected
+            if protected:
+                print("{}\t{}".format(user_id, "protected"))
+                is_public = False
+            else:
+                print("{}\t{}".format(user_id, u))
+                is_public = True
+        except Exception as e:
+            print("{}\t{}".format(user_id, e))
+            is_public = False
+
+        return is_public
+
+    def is_account_public_for_all(self, user_id_list: list = None) -> Dict[str, bool]:
+
+        is_public_list = []
+        user_id_list = user_id_list or list(self.network.error_user_set)
+        copied_user_id_list = deepcopy(user_id_list)
+
+        # TODO: Not efficient
+        while user_id_list:
+            for api in self.api_list:
+                user_id = user_id_list.pop(0)
+                is_public = self.is_account_public_for_one(api, user_id)
+                is_public_list.append(is_public)
+
+                if not user_id_list:
+                    break
+
+            print("Users to check: {}".format(len(user_id_list)))
+            wait_second(1)
+
+        return dict(zip(copied_user_id_list, is_public_list))
+
+    def remove_unexpected_error_users(self, file_name: str = None):
+        is_public_dict = self.is_account_public_for_all(list(self.network.error_user_set))
+        for user_id, is_public in is_public_dict.items():
+
+            if not is_public:
+                continue
+
+            try:
+                del self.network.user_id_to_follower_ids[user_id]
+            except Exception as e:
+                print(e)
+
+            try:
+                del self.network.user_id_to_friend_ids[user_id]
+            except Exception as e:
+                print(e)
+
+            try:
+                self.network.user_set.remove(user_id)
+            except Exception as e:
+                print(e)
+
+            try:
+                self.network.error_user_set.remove(user_id)
+            except Exception as e:
+                print(e)
+
+        self.network.dump(file_name)
+        print(colored("Dumped from {}".format(self.__class__.__name__), "blue"))
+
+
 if __name__ == '__main__':
 
     MODE = 'MP_API_RUN'
@@ -401,6 +482,13 @@ if __name__ == '__main__':
             max_process=0,
         )
         multiprocess_user_network_api.merge_partial_files_of_processes()
+
+    elif MODE == "CHECK_AND_REMOVE":
+        given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
+        checker = UserNetworkChecker(
+            config_file_path_list=given_config_file_path_list,
+        )
+        checker.remove_unexpected_error_users()
 
     else:
         user_network = UserNetwork()
