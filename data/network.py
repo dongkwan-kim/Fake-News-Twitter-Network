@@ -82,8 +82,11 @@ class UserNetwork:
                 file_name = "UserNetwork.pkl"
                 target_file_list = [f for f in os.listdir(NETWORK_PATH)
                                     if "SlicedUserNetwork" in f or "UserNetwork.pkl" in f]
-                for network_file in target_file_list:
+                if not target_file_list:
+                    raise FileNotFoundError
+                for i, network_file in enumerate(target_file_list):
                     self._sliced_load(network_file)
+                    self.print_info("SlicedLoaded ({}/{})".format(i+1, len(target_file_list)), network_file, "green")
             else:
                 self._sliced_load(file_name)
             self.print_info('Loaded', file_name, 'green')
@@ -105,7 +108,11 @@ class UserNetwork:
 
 class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
-    def __init__(self, config_file_path: str, user_set: set, dump_file_id: int = None, what_to_crawl: str = "follower",
+    def __init__(self,
+                 config_file_path: str or list,
+                 user_set: set,
+                 dump_file_id: int = None,
+                 what_to_crawl: str = "follower",
                  sec_to_wait: int = 60):
         """
         Attributes
@@ -156,7 +163,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self.user_id_to_friend_ids = {k: [] for k in self.user_id_to_friend_ids.keys()}
             self.user_id_to_follower_ids = {k: [] for k in self.user_id_to_follower_ids.keys()}
 
-    def get_and_dump_user_network(self, file_name: str = None, with_load=True):
+    def get_and_dump_user_network(self, file_name: str = None, with_load=True, save_point=10):
         first_wait = 5
         print('Just called get_and_dump_user_network(), which is a really heavy method.\n',
               'This will start after {0}s.'.format(first_wait))
@@ -166,17 +173,25 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self._load_user_network(file_name)
 
         if self.what_to_crawl == "follower":
-            self.get_user_id_to_follower_ids()
+            self.get_user_id_to_follower_ids(file_name, save_point)
         elif self.what_to_crawl == "friend":
-            self.get_user_id_to_friend_ids()
+            self.get_user_id_to_friend_ids(file_name, save_point)
 
         time.sleep(1)
-        return self._dump_user_network(file_name)
+        r = self._dump_user_network(file_name)
+        self.backup(max(self.user_id_to_follower_ids, self.user_id_to_friend_ids), len(self.error_user_set))
+        return r
 
-    def get_user_id_to_target_ids(self, user_id_to_target_ids, fetch_target_ids, save_point=10):
-        # user_id: str
-        len_user_set = len(self.user_set)
-        for i, user_id in enumerate(self.user_set):
+    def get_user_id_to_target_ids(self, file_name, user_id_to_target_ids, fetch_target_ids, save_point=10):
+
+        user_list_need_crawling = None
+        if self.what_to_crawl == "follower":
+            user_list_need_crawling = [u for u in self.user_set if u not in self.user_id_to_follower_ids]
+        elif self.what_to_crawl == "friend":
+            user_list_need_crawling = [u for u in self.user_set if u not in self.user_id_to_friend_ids]
+
+        len_user_set = len(user_list_need_crawling)
+        for i, user_id in enumerate(user_list_need_crawling):
 
             if user_id != 'ROOT' and user_id not in user_id_to_target_ids and user_id not in self.error_user_set:
                 target_ids = fetch_target_ids(user_id)
@@ -185,14 +200,14 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
                     self.error_user_set.add(user_id)
 
             if (i + 1) % save_point == 0:
-                self._dump_user_network()
+                self._dump_user_network(file_name)
                 print('{0} | {1}/{2} finished.'.format(os.getpid(), i + 1, len_user_set))
 
-    def get_user_id_to_follower_ids(self, save_point=10):
-        self.get_user_id_to_target_ids(self.user_id_to_follower_ids, self._fetch_follower_ids, save_point)
+    def get_user_id_to_follower_ids(self, file_name, save_point=10):
+        self.get_user_id_to_target_ids(file_name, self.user_id_to_follower_ids, self._fetch_follower_ids, save_point)
 
-    def get_user_id_to_friend_ids(self, save_point=10):
-        self.get_user_id_to_target_ids(self.user_id_to_friend_ids, self._fetch_friend_ids, save_point)
+    def get_user_id_to_friend_ids(self, file_name, save_point=10):
+        self.get_user_id_to_target_ids(file_name, self.user_id_to_friend_ids, self._fetch_friend_ids, save_point)
 
     def paged_to_all(self, user_id, paged_func) -> list:
 
@@ -207,7 +222,9 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             print('{0} | Fetched user({1})\'s {2} of {3}, Stopped: {4}'.format(
                 os.getpid(), user_id, len(all_list), paged_func.__name__, fetch_stop
             ))
-            wait_second(self.sec_to_wait)
+
+            if self.is_single:
+                wait_second(self.sec_to_wait)
 
             if fetch_stop:
                 break
@@ -220,7 +237,8 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         except Exception as e:
             print('{0} |'.format(os.getpid()),
                   colored('Error in follower ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
-            wait_second(self.sec_to_wait)
+            if self.is_single:
+                wait_second(self.sec_to_wait)
             return None
 
     def _fetch_friend_ids(self, user_id) -> list or None:
@@ -229,12 +247,13 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         except Exception as e:
             print('{0} |'.format(os.getpid()),
                   colored('Error in friend ids: {0}'.format(user_id), 'red', 'on_yellow'), e)
-            wait_second(self.sec_to_wait)
+            if self.is_single:
+                wait_second(self.sec_to_wait)
             return None
 
     def _fetch_follower_ids_paged(self, user_id, cursor=-1) -> (int, int, list):
         # http://python-twitter.readthedocs.io/en/latest/twitter.html#twitter.api.Api.GetFollowerIDsPaged
-        next_cursor, prev_cursor, follower_ids = self.api.GetFollowerIDsPaged(
+        next_cursor, prev_cursor, follower_ids = self.GetFollowerIDsPaged(
             user_id=user_id,
             cursor=cursor,
         )
@@ -242,134 +261,29 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
     def _fetch_friend_ids_paged(self, user_id, cursor=-1) -> (int, int, list):
         # http://python-twitter.readthedocs.io/en/latest/twitter.html#twitter.api.Api.GetFriendIDsPaged
-        next_cursor, prev_cursor, friend_ids = self.api.GetFriendIDsPaged(
+        next_cursor, prev_cursor, friend_ids = self.GetFriendIDsPaged(
             user_id=user_id,
             cursor=cursor,
         )
         return next_cursor, prev_cursor, friend_ids
 
-
-class MultiprocessUserNetworkAPIWrapper:
-
-    def __init__(self, config_file_path_list: List[str], user_set: set,
-                 max_process: int, what_to_crawl: str = "follower", sec_to_wait: int = 60):
-
-        self.config_file_path_list = config_file_path_list
-        self.user_set = user_set
-        self.max_process = max_process
-        self.sec_to_wait = sec_to_wait
-        self.what_to_crawl = what_to_crawl
-
-    def get_and_dump_user_network(self, single_user_network_api: UserNetworkAPIWrapper,
-                                  file_name: str = None, with_load: bool = None):
-        single_user_network_api.dump_file_id = os.getpid()
-        single_user_network_api.get_and_dump_user_network(file_name=file_name, with_load=with_load)
-        cprint('{0} | get_and_dump_user_network finished'.format(os.getpid()), 'blue')
-
-    def load_and_merge_user_networks(self, user_network_file_list: List[str], file_name: str = None):
-        main_network = UserNetwork(
-            dump_file_id=None,
-            user_id_to_follower_ids=dict(),
-            user_id_to_friend_ids=dict(),
-            user_set=set(),
-            error_user_set=set(),
-        )
-        main_network.load(file_name)
-
-        for partial_network_file in user_network_file_list:
-            loaded_partial_network = UserNetwork()
-            if loaded_partial_network.load(partial_network_file):
-                main_network.user_id_to_follower_ids = merge_dicts(main_network.user_id_to_follower_ids,
-                                                                   loaded_partial_network.user_id_to_follower_ids)
-                main_network.user_id_to_friend_ids = merge_dicts(main_network.user_id_to_friend_ids,
-                                                                 loaded_partial_network.user_id_to_friend_ids)
-                main_network.error_user_set.update(loaded_partial_network.error_user_set)
-                main_network.user_set.update(loaded_partial_network.user_set)
-
-        return main_network
-
-    def get_and_dump_user_network_with_multiprocess(self, goal: int = None,
-                                                    file_name: str = None, file_to_load: str = None):
-        num_process = min(self.max_process, len(self.config_file_path_list))
-        print(colored('{0} called get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
-            self.__class__.__name__, num_process,
-        ), 'green'))
-
-        process_list: List[Process] = []
-
-        existing_user_network = UserNetwork()
-        existing_user_network.load(file_to_load)
-
-        user_list_need_crawling = None
-        if self.what_to_crawl == "follower":
-            user_list_need_crawling = [u for u in self.user_set
-                                       if u not in existing_user_network.user_id_to_follower_ids]
-        elif self.what_to_crawl == "friend":
-            user_list_need_crawling = [u for u in self.user_set
-                                       if u not in existing_user_network.user_id_to_friend_ids]
-
-        user_set_sliced_by_goal = set(user_list_need_crawling[:goal]) if goal else self.user_set
-        for config_file_path, partial_set in zip(self.config_file_path_list,
-                                                 slice_set_by_segment(user_set_sliced_by_goal, num_process)):
-            # dump file id will be assigned at get_and_dump_user_network()
-            single_user_network_api = UserNetworkAPIWrapper(
-                config_file_path=config_file_path,
-                user_set=partial_set,
-                dump_file_id=None,
-                what_to_crawl=self.what_to_crawl,
-                sec_to_wait=self.sec_to_wait,
-            )
-
-            # I do not know why this line is necessary, but it is. So do not remove it.
-            single_user_network_api.verify_credentials()
-
-            process = Process(target=self.get_and_dump_user_network,
-                              args=(single_user_network_api, file_name, False))
-            process.start()
-            process_list.append(process)
-            wait_second(15)
-
-        # Wait for other processes.
-        for process in process_list:
-            process.join()
-
-        self.merge_partial_files_of_processes(file_name, process_list)
-
-        wait_second(1)
-        print(colored('{0} finished get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
-            self.__class__.__name__, num_process,
-        ), 'blue'))
-
-    def merge_partial_files_of_processes(self, file_name: str = None, process_list: list = None):
-        if process_list:
-            partial_user_network_file_list = ['UserNetwork{0}.pkl'.format('_' + str(p.pid)) for p in process_list]
-        else:
-            process_file_pattern = re.compile("UserNetwork_[\d+]")
-            partial_user_network_file_list = [f for f in os.listdir(NETWORK_PATH) if process_file_pattern.match(f)]
-            print("Find {} partial files".format(len(partial_user_network_file_list)))
-            if len(partial_user_network_file_list) == 0:
-                return
-
-        merged_network = self.load_and_merge_user_networks(partial_user_network_file_list)
-        merged_network.dump(file_name)
-
+    def backup(self, get_num_of_crawled_users, len_error_user_set):
         # Backup merged file
-        new_dir = 'backup_c{0}_e{1}'.format(
-            merged_network.get_num_of_crawled_users(),
-            len(merged_network.error_user_set)
+        new_dir = 'backup_{}_c{0}_e{1}'.format(
+            self.what_to_crawl,
+            get_num_of_crawled_users,
+            len_error_user_set,
         )
         os.mkdir(os.path.join(NETWORK_PATH, new_dir))
-        target_file_list = [f for f in os.listdir(NETWORK_PATH)
-                            if "SlicedUserNetwork" in f or "UserNetwork.pkl" in f]
+
+        if self.what_to_crawl == "friend":
+            target_file_list = ["UserNetwork_friends.pkl"]
+        else:
+            target_file_list = [f for f in os.listdir(NETWORK_PATH) if "SlicedUserNetwork" in f]
+
         for target_file in target_file_list:
             shutil.copyfile(os.path.join(NETWORK_PATH, target_file),
                             os.path.join(NETWORK_PATH, new_dir, target_file))
-
-        sec_to_clean = 5
-        print(colored('Partial files will be removed in {0} secs'.format(sec_to_clean), 'red', 'on_yellow'))
-        wait_second(sec_to_clean, with_tqdm=True)
-        for partial_network in partial_user_network_file_list:
-            os.remove(os.path.join(NETWORK_PATH, partial_network))
 
 
 class UserNetworkChecker:
@@ -377,9 +291,7 @@ class UserNetworkChecker:
     def __init__(self, config_file_path_list, file_name: str = None, load: bool = True):
 
         self.config_file_path_list = config_file_path_list
-        self.api_list: List[TwitterAPIWrapper] = []
-        for config_file_path in config_file_path_list:
-            self.api_list.append(TwitterAPIWrapper(config_file_path))
+        self.apis = TwitterAPIWrapper(config_file_path_list)
 
         self.network = UserNetwork(dump_file_id=42)
         if load:
@@ -387,7 +299,7 @@ class UserNetworkChecker:
 
     def is_account_public_for_one(self, api: TwitterAPIWrapper, user_id):
         try:
-            u = api.api.GetUser(user_id=user_id)
+            u = api.GetUser(user_id=user_id)
             protected = u.protected
             if protected:
                 print("{}\t{}".format(user_id, "protected"))
@@ -407,18 +319,14 @@ class UserNetworkChecker:
         user_id_list = user_id_list or list(self.network.error_user_set)
         copied_user_id_list = deepcopy(user_id_list)
 
-        # TODO: Not efficient
         while user_id_list:
-            for api in self.api_list:
-                user_id = user_id_list.pop(0)
-                is_public = self.is_account_public_for_one(api, user_id)
-                is_public_list.append(is_public)
+            user_id = user_id_list.pop(0)
+            is_public = self.is_account_public_for_one(self.apis, user_id)
+            is_public_list.append(is_public)
 
-                if not user_id_list:
-                    break
-
-            print("Users to check: {}".format(len(user_id_list)))
-            wait_second(1)
+            user_size = len(user_id_list)
+            if user_size % 100 == 0:
+                print("Users to check: {}".format(user_size))
 
         return dict(zip(copied_user_id_list, is_public_list))
 
@@ -455,8 +363,9 @@ class UserNetworkChecker:
 
 if __name__ == '__main__':
 
-    MODE = 'MP_API_RUN'
+    MODE = 'MP_API_RUN_V2'
     what_to_crawl_in_main = "follower"
+    main_file_name = "UserNetwork_friends.pkl" if what_to_crawl_in_main == "friend" else None
     start_time = time.time()
 
     user_set_from_fe = None
@@ -481,24 +390,14 @@ if __name__ == '__main__':
         )
         user_network_api.get_and_dump_user_network()
 
-    elif MODE == 'MP_API_RUN':
-        max_process = 19
+    elif MODE == 'MP_API_RUN_V2':
         given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
-        multiprocess_user_network_api = MultiprocessUserNetworkAPIWrapper(
-            config_file_path_list=given_config_file_path_list,
+        user_network_api = UserNetworkAPIWrapper(
+            config_file_path=given_config_file_path_list,
             user_set=user_set_from_fe,
-            max_process=max_process,
             what_to_crawl=what_to_crawl_in_main,
         )
-        multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 24)
-
-    elif MODE == 'MERGE_FILES':
-        multiprocess_user_network_api = MultiprocessUserNetworkAPIWrapper(
-            config_file_path_list=[],
-            user_set=user_set_from_fe,
-            max_process=0,
-        )
-        multiprocess_user_network_api.merge_partial_files_of_processes()
+        user_network_api.get_and_dump_user_network(file_name=main_file_name, save_point=1000)
 
     elif MODE == "CHECK_AND_REMOVE":
         given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
