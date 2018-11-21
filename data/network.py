@@ -48,10 +48,10 @@ class UserNetwork:
         with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
 
-    def dump(self, file_name: str = None, file_slice: int = 10):
+    def dump(self, given_file_name: str = None, file_slice: int = 10):
         dump_file_id_str = ('_' + str(self.dump_file_id)) if self.dump_file_id else ''
-        file_name = file_name or 'UserNetwork{0}.pkl'.format(dump_file_id_str)
-        if not self.dump_file_id:
+        if not given_file_name:
+            file_name = "SlicedUserNetwork_*.pkl"
             for slice_idx in range(file_slice):
                 sliced_network = UserNetwork(
                     dump_file_id=None,
@@ -61,8 +61,8 @@ class UserNetwork:
                     error_user_set={u for i, u in enumerate(self.error_user_set) if i % file_slice == slice_idx},
                 )
                 sliced_network._sliced_dump(slice_idx)
-            file_name = "SlicedUserNetwork_*.pkl"
         else:
+            file_name = given_file_name or 'UserNetwork{0}.pkl'.format(dump_file_id_str)
             with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
                 pickle.dump(self, f)
         self.print_info('Dumped', file_name, 'blue')
@@ -105,7 +105,8 @@ class UserNetwork:
 
 class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
-    def __init__(self, config_file_path: str, user_set: set, dump_file_id: int = None, sec_to_wait: int = 60):
+    def __init__(self, config_file_path: str, user_set: set, dump_file_id: int = None, what_to_crawl: str = "follower",
+                 sec_to_wait: int = 60):
         """
         Attributes
         ----------
@@ -118,6 +119,8 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         self.user_set: set = user_set
         self.error_user_set: set = set()
         self.sec_to_wait = sec_to_wait
+        self.what_to_crawl = what_to_crawl
+        assert what_to_crawl is "friend" or what_to_crawl is "follower"
 
         # user IDs for every user following the specified user.
         self.user_id_to_follower_ids: dict = dict()
@@ -162,8 +165,10 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         if with_load:
             self._load_user_network(file_name)
 
-        self.get_user_id_to_follower_ids()
-        # self.get_user_id_to_friend_ids()
+        if self.what_to_crawl == "follower":
+            self.get_user_id_to_follower_ids()
+        elif self.what_to_crawl == "friend":
+            self.get_user_id_to_friend_ids()
 
         time.sleep(1)
         return self._dump_user_network(file_name)
@@ -246,12 +251,14 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
 class MultiprocessUserNetworkAPIWrapper:
 
-    def __init__(self, config_file_path_list: List[str], user_set: set, max_process: int, sec_to_wait: int = 60):
+    def __init__(self, config_file_path_list: List[str], user_set: set,
+                 max_process: int, what_to_crawl: str = "follower", sec_to_wait: int = 60):
 
         self.config_file_path_list = config_file_path_list
         self.user_set = user_set
         self.max_process = max_process
         self.sec_to_wait = sec_to_wait
+        self.what_to_crawl = what_to_crawl
 
     def get_and_dump_user_network(self, single_user_network_api: UserNetworkAPIWrapper,
                                   file_name: str = None, with_load: bool = None):
@@ -281,7 +288,8 @@ class MultiprocessUserNetworkAPIWrapper:
 
         return main_network
 
-    def get_and_dump_user_network_with_multiprocess(self, goal: int = None, file_name: str = None):
+    def get_and_dump_user_network_with_multiprocess(self, goal: int = None,
+                                                    file_name: str = None, file_to_load: str = None):
         num_process = min(self.max_process, len(self.config_file_path_list))
         print(colored('{0} called get_and_dump_user_network_with_multiprocess() with {1} processes'.format(
             self.__class__.__name__, num_process,
@@ -290,11 +298,15 @@ class MultiprocessUserNetworkAPIWrapper:
         process_list: List[Process] = []
 
         existing_user_network = UserNetwork()
-        existing_user_network.load()
+        existing_user_network.load(file_to_load)
 
-        # For now, we only consider user_id_to_X.
-        user_list_need_crawling = [u for u in self.user_set
-                                   if u not in existing_user_network.user_id_to_follower_ids]
+        user_list_need_crawling = None
+        if self.what_to_crawl == "follower":
+            user_list_need_crawling = [u for u in self.user_set
+                                       if u not in existing_user_network.user_id_to_follower_ids]
+        elif self.what_to_crawl == "friend":
+            user_list_need_crawling = [u for u in self.user_set
+                                       if u not in existing_user_network.user_id_to_friend_ids]
 
         user_set_sliced_by_goal = set(user_list_need_crawling[:goal]) if goal else self.user_set
         for config_file_path, partial_set in zip(self.config_file_path_list,
@@ -304,6 +316,7 @@ class MultiprocessUserNetworkAPIWrapper:
                 config_file_path=config_file_path,
                 user_set=partial_set,
                 dump_file_id=None,
+                what_to_crawl=self.what_to_crawl,
                 sec_to_wait=self.sec_to_wait,
             )
 
@@ -368,7 +381,7 @@ class UserNetworkChecker:
         for config_file_path in config_file_path_list:
             self.api_list.append(TwitterAPIWrapper(config_file_path))
 
-        self.network = UserNetwork()
+        self.network = UserNetwork(dump_file_id=42)
         if load:
             self.network.load(file_name)
 
@@ -443,6 +456,7 @@ class UserNetworkChecker:
 if __name__ == '__main__':
 
     MODE = 'MP_API_RUN'
+    what_to_crawl_in_main = "follower"
     start_time = time.time()
 
     user_set_from_fe = None
@@ -455,6 +469,7 @@ if __name__ == '__main__':
         user_network_api = UserNetworkAPIWrapper(
             config_file_path='./config/config_01.ini',
             user_set={'836322793', '318956466', '2567151784', '1337170682', '3374714687', '47353139', '23196051'},
+            what_to_crawl=what_to_crawl_in_main,
         )
         user_network_api.get_and_dump_user_network('UserNetwork_test.pkl')
 
@@ -462,6 +477,7 @@ if __name__ == '__main__':
         user_network_api = UserNetworkAPIWrapper(
             config_file_path='./config/config_01.ini',
             user_set=user_set_from_fe,
+            what_to_crawl=what_to_crawl_in_main,
         )
         user_network_api.get_and_dump_user_network()
 
@@ -472,6 +488,7 @@ if __name__ == '__main__':
             config_file_path_list=given_config_file_path_list,
             user_set=user_set_from_fe,
             max_process=max_process,
+            what_to_crawl=what_to_crawl_in_main,
         )
         multiprocess_user_network_api.get_and_dump_user_network_with_multiprocess(goal=max_process * 60 * 24)
 
