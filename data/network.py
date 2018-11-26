@@ -48,7 +48,7 @@ class UserNetwork:
         with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
 
-    def dump(self, given_file_name: str = None, file_slice: int = 10):
+    def dump(self, given_file_name: str = None, file_slice: int = 11):
         dump_file_id_str = ('_' + str(self.dump_file_id)) if self.dump_file_id else ''
         if not given_file_name:
             file_name = "SlicedUserNetwork_*.pkl"
@@ -159,10 +159,6 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self.user_id_to_follower_ids = loaded_user_network.user_id_to_follower_ids
             self.error_user_set = loaded_user_network.error_user_set
 
-        if current_process().name != 'MainProcess':
-            self.user_id_to_friend_ids = {k: [] for k in self.user_id_to_friend_ids.keys()}
-            self.user_id_to_follower_ids = {k: [] for k in self.user_id_to_follower_ids.keys()}
-
     def get_and_dump_user_network(self, file_name: str = None, with_load=True, save_point=10):
         first_wait = 5
         print('Just called get_and_dump_user_network(), which is a really heavy method.\n',
@@ -179,7 +175,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
         time.sleep(1)
         r = self._dump_user_network(file_name)
-        self.backup(max(self.user_id_to_follower_ids, self.user_id_to_friend_ids), len(self.error_user_set))
+        self.backup(max(len(self.user_id_to_follower_ids), len(self.user_id_to_friend_ids)), len(self.error_user_set))
         return r
 
     def get_user_id_to_target_ids(self, file_name, user_id_to_target_ids, fetch_target_ids, save_point=10):
@@ -194,10 +190,18 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         for i, user_id in enumerate(user_list_need_crawling):
 
             if user_id != 'ROOT' and user_id not in user_id_to_target_ids and user_id not in self.error_user_set:
+
                 target_ids = fetch_target_ids(user_id)
                 user_id_to_target_ids[user_id] = target_ids
-                if not target_ids:
-                    self.error_user_set.add(user_id)
+
+                if target_ids is None:
+                    if UserNetworkChecker.is_account_public_for_one(self, user_id):
+                        cprint("PublicNotCrawledError Found at {}".format(user_id), "red")
+                        while target_ids is None:
+                            target_ids = fetch_target_ids(user_id)
+                            user_id_to_target_ids[user_id] = target_ids
+                    else:
+                        self.error_user_set.add(user_id)
 
             if (i + 1) % save_point == 0:
                 self._dump_user_network(file_name)
@@ -269,7 +273,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
     def backup(self, get_num_of_crawled_users, len_error_user_set):
         # Backup merged file
-        new_dir = 'backup_{}_c{0}_e{1}'.format(
+        new_dir = 'backup_{0}_c{1}_e{2}'.format(
             self.what_to_crawl,
             get_num_of_crawled_users,
             len_error_user_set,
@@ -297,7 +301,8 @@ class UserNetworkChecker:
         if load:
             self.network.load(file_name)
 
-    def is_account_public_for_one(self, api: TwitterAPIWrapper, user_id):
+    @staticmethod
+    def is_account_public_for_one(api: TwitterAPIWrapper, user_id):
         try:
             u = api.GetUser(user_id=user_id)
             protected = u.protected
@@ -332,6 +337,10 @@ class UserNetworkChecker:
 
     def remove_unexpected_error_users(self, file_name: str = None):
         is_public_dict = self.is_account_public_for_all(list(self.network.error_user_set))
+        if not any(is_public_dict.values()):
+            print("All error users are not public")
+            return
+
         for user_id, is_public in is_public_dict.items():
 
             if not is_public:
@@ -408,8 +417,8 @@ if __name__ == '__main__':
 
     else:
         user_network = UserNetwork()
-        user_network.load()
-        print('Total {0} users.'.format(len(user_network.user_id_to_follower_ids)))
+        user_network.load(file_name=main_file_name)
+        print('Total {0} users.'.format(user_network.get_num_of_crawled_users()))
         print('Total {0} error users.'.format(len(user_network.error_user_set)))
 
     total_consumed_secs = time.time() - start_time
