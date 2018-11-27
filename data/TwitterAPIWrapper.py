@@ -11,7 +11,7 @@ class TwitterAPIWrapper:
     def __init__(self, config_file_path_or_list: str or list):
         self.is_single = isinstance(config_file_path_or_list, str)
 
-        methods = ["GetFollowerIDsPaged", "GetFriendIDsPaged", "GetUser"]
+        methods = ["GetFollowerIDsPaged", "GetFriendIDsPaged", "GetUser", "ShowFriendship"]
 
         self.api, self.apis = None, None
         if self.is_single:
@@ -49,7 +49,7 @@ class TwitterAPIWrapper:
                 return api
         return None
 
-    def schedule_available_api(self, method, check_interval=15) -> twitter.Api:
+    def schedule_available_api(self, method, check_interval) -> twitter.Api:
         assert not self.is_single
 
         api = None
@@ -69,32 +69,53 @@ class TwitterAPIWrapper:
         timer = threading.Timer(time_in_sec, toggle_available, [self.apis, api_to_block, method_to_block])
         timer.start()
 
-    def GetFollowerIDsPaged(self, user_id, cursor):
+    def GetFollowerIDsPaged(self, user_id, cursor, check_interval=15):
         if self.is_single:
             return self.api.GetFollowerIDsPaged(user_id=user_id, cursor=cursor)
         else:
-            api = self.schedule_available_api("GetFollowerIDsPaged")
+            api = self.schedule_available_api("GetFollowerIDsPaged", check_interval)
             self.block_api_for_time(api, "GetFollowerIDsPaged", 60 + 2)
             results = api.GetFollowerIDsPaged(user_id=user_id, cursor=cursor)
             return results
 
-    def GetFriendIDsPaged(self, user_id, cursor):
+    def GetFriendIDsPaged(self, user_id, cursor, check_interval=15):
         if self.is_single:
             return self.api.GetFriendIDsPaged(user_id=user_id, cursor=cursor)
         else:
-            api = self.schedule_available_api("GetFriendIDsPaged")
+            api = self.schedule_available_api("GetFriendIDsPaged", check_interval)
             self.block_api_for_time(api, "GetFriendIDsPaged", 60 + 2)
             results = api.GetFriendIDsPaged(user_id=user_id, cursor=cursor)
             return results
 
-    def GetUser(self, user_id):
+    def GetUser(self, user_id, check_interval=15):
         if self.is_single:
             return self.api.GetUser(user_id=user_id)
         else:
-            api = self.schedule_available_api("GetUser")
+            api = self.schedule_available_api("GetUser", check_interval)
             self.block_api_for_time(api, "GetUser", 1 + 1)
             results = api.GetUser(user_id=user_id)
             return results
+
+    def ShowFriendship(self, source_user_id, target_user_id, check_interval=15):
+        if self.is_single:
+            return self.api.ShowFriendship()
+        else:
+            api = self.schedule_available_api("ShowFriendship", check_interval)
+            self.block_api_for_time(api, "ShowFriendship", 5 + 1)
+            results = api.ShowFriendship(source_user_id=source_user_id, target_user_id=target_user_id)
+            return results
+
+    def get_sft_and_tfs(self, source_use_id, target_user_id, check_interval=15):
+        if source_use_id == target_user_id:
+            return False, False
+        try:
+            relationship = self.ShowFriendship(source_use_id, target_user_id, check_interval=check_interval)
+            is_source_follows_target = relationship["relationship"]["source"]["following"]
+            is_target_follows_source = relationship["relationship"]["target"]["following"]
+            return is_source_follows_target, is_target_follows_source
+        except Exception as e:
+            print("Error in get_sft_and_tfs with ({}, {}): ".format(source_use_id, target_user_id), e)
+            return e
 
     def VerifyCredentials(self):
         try:
@@ -110,5 +131,6 @@ if __name__ == '__main__':
     test_api = TwitterAPIWrapper(['./config/config_01.ini', './config/config_02.ini'])
     print(test_api.VerifyCredentials())
 
-    for u in {'836322793', '318956466', '2567151784', '1337170682'}:
-        print(test_api.GetFollowerIDsPaged(u, -1))
+    for u in {'836322793', '813286', '1339835893', '12345234'}:
+        for v in {'836322793', '813286', '1339835893', '12345234'}:
+            print(u, v, test_api.get_sft_and_tfs(u, v, check_interval=5))
