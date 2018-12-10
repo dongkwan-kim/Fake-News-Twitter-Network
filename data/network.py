@@ -8,7 +8,6 @@ from format_story import *
 from termcolor import colored, cprint
 from utill import *
 from typing import List, Dict
-from multiprocessing import Process, current_process
 import os
 import shutil
 import time
@@ -292,13 +291,13 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
 class UserNetworkChecker:
 
-    def __init__(self, config_file_path_list, file_name: str = None, load: bool = True):
+    def __init__(self, config_file_path_list, file_name: str = None, is_load: bool = True):
 
         self.config_file_path_list = config_file_path_list
         self.apis = TwitterAPIWrapper(config_file_path_list)
 
         self.network = UserNetwork(dump_file_id=42)
-        if load:
+        if is_load:
             self.network.load(file_name)
 
     @staticmethod
@@ -335,29 +334,27 @@ class UserNetworkChecker:
 
         return dict(zip(copied_user_id_list, is_public_list))
 
-    def remove_unexpected_error_users(self, file_name: str = None):
+    def refill_unexpected_error_users(self, file_name: str = None, save_point=1000):
         is_public_dict = self.is_account_public_for_all(list(self.network.error_user_set))
         if not any(is_public_dict.values()):
             print("All error users are not public")
             return
 
+        what_crawled = None
         for user_id, is_public in is_public_dict.items():
 
             if not is_public:
                 continue
 
             try:
+                what_crawled = "follower"
                 del self.network.user_id_to_follower_ids[user_id]
             except Exception as e:
                 print(e)
 
             try:
+                what_crawled = "friend"
                 del self.network.user_id_to_friend_ids[user_id]
-            except Exception as e:
-                print(e)
-
-            try:
-                self.network.user_set.remove(user_id)
             except Exception as e:
                 print(e)
 
@@ -366,14 +363,21 @@ class UserNetworkChecker:
             except Exception as e:
                 print(e)
 
-        self.network.dump(file_name)
-        print(colored("Dumped from {}".format(self.__class__.__name__), "blue"))
+        _user_network_api = UserNetworkAPIWrapper(
+            config_file_path=self.config_file_path_list,
+            user_set=self.network.user_set,
+            what_to_crawl=what_crawled,
+        )
+        _user_network_api.user_id_to_friend_ids = self.network.user_id_to_friend_ids
+        _user_network_api.user_id_to_follower_ids = self.network.user_id_to_follower_ids
+        _user_network_api.error_user_set = self.network.error_user_set
+        _user_network_api.get_and_dump_user_network(file_name=file_name, with_load=False, save_point=save_point)
 
 
 if __name__ == '__main__':
 
-    MODE = 'MP_API_RUN_V2'
-    what_to_crawl_in_main = "follower"
+    MODE = 'CHECK_AND_REFILL'
+    what_to_crawl_in_main = "friend"
     main_file_name = "UserNetwork_friends.pkl" if what_to_crawl_in_main == "friend" else None
     start_time = time.time()
 
@@ -408,12 +412,13 @@ if __name__ == '__main__':
         )
         user_network_api.get_and_dump_user_network(file_name=main_file_name, save_point=1000)
 
-    elif MODE == "CHECK_AND_REMOVE":
+    elif MODE == "CHECK_AND_REFILL":
         given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
         checker = UserNetworkChecker(
             config_file_path_list=given_config_file_path_list,
+            file_name=main_file_name,
         )
-        checker.remove_unexpected_error_users()
+        checker.refill_unexpected_error_users(file_name=main_file_name, save_point=1000)
 
     else:
         user_network = UserNetwork()
