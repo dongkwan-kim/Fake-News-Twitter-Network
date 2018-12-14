@@ -116,6 +116,10 @@ def slice_set_by_size(given_set: set, sz: int) -> List[set]:
     return [set(lst[i:i + sz]) for i in range(0, len(lst), sz)]
 
 
+def round_up_division(numerator: int, denominator: int) -> int:
+    return int(numerator/denominator) + (numerator % denominator > 0)
+
+
 if __name__ == '__main__':
     print(get_attribute_of_html('<a href="/nytimeses" title="NYTimes en Español"'))
     print(get_attribute_of_html('<a>'))
