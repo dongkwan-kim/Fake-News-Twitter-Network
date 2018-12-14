@@ -96,26 +96,27 @@ class TwitterAPIWrapper:
             results = api.GetUser(user_id=user_id)
             return results
 
-    def ShowFriendship(self, source_user_id, target_user_id, check_interval=15):
+    def ShowFriendship(self, source_user_id, target_user_id, check_interval=6):
         if self.is_single:
             return self.api.ShowFriendship()
         else:
             api = self.schedule_available_api("ShowFriendship", check_interval)
-            self.block_api_for_time(api, "ShowFriendship", 5 + 1)
+            self.block_api_for_time(api, "ShowFriendship", 5)
             results = api.ShowFriendship(source_user_id=source_user_id, target_user_id=target_user_id)
             return results
 
-    def get_sft_and_tfs(self, source_use_id, target_user_id, check_interval=15):
+    def get_sft_and_tfs(self, source_use_id, target_user_id, check_interval=15) -> (int, int):
+        print(source_use_id, target_user_id)
         if source_use_id == target_user_id:
-            return False, False
+            return 0, 0
         try:
             relationship = self.ShowFriendship(source_use_id, target_user_id, check_interval=check_interval)
-            is_source_follows_target = relationship["relationship"]["source"]["following"]
-            is_target_follows_source = relationship["relationship"]["target"]["following"]
-            return is_source_follows_target, is_target_follows_source
+            source_follows_target = relationship["relationship"]["source"]["following"]
+            target_follows_source = relationship["relationship"]["target"]["following"]
+            return int(source_follows_target), int(target_follows_source)
         except Exception as e:
             print("Error in get_sft_and_tfs with ({}, {}): ".format(source_use_id, target_user_id), e)
-            return e
+            return -1, -1
 
     def VerifyCredentials(self):
         try:
