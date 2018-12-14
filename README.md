@@ -1,2 +1,2 @@
-# Paris
-Utilizing Crowd Signals to Detect Fake News in Political Echo Chamber
+# Fake-News-Twitter-Network
+Twitter Social Network that Fake News Propagated
