@@ -192,6 +192,10 @@ class AdjMatrixFromNetwork:
         return mat
 
     def get_sft(self, s, t):
+
+        if s == t:
+            return 0
+
         friend_ids = self.user_id_to_friend_ids[str(s)]
         if friend_ids:
             s_follows_t = int(t in friend_ids)
@@ -228,8 +232,8 @@ class AdjMatrixFromNetwork:
                 col_vertices = self.vertices[col_base:col_base + self.batch_size]
 
                 mat = self._get_batch_matrix(row_vertices, col_vertices, tuple_key)
-                print(mat)
                 mat.dump()
+                print(mat)
 
 
 def get_adj_matrix_from_user_network(friend_file, follower_file, batch_size=10000):
