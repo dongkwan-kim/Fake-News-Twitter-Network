@@ -105,7 +105,7 @@ class TwitterAPIWrapper:
             results = api.ShowFriendship(source_user_id=source_user_id, target_user_id=target_user_id)
             return results
 
-    def get_sft_and_tfs(self, source_use_id, target_user_id, check_interval=15) -> (int, int):
+    def get_sft_and_tfs(self, source_use_id, target_user_id, check_interval=6) -> (int, int):
         print(source_use_id, target_user_id)
         if source_use_id == target_user_id:
             return 0, 0
