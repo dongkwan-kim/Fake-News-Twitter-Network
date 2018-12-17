@@ -8,21 +8,26 @@ ADJ_PATH = os.path.join(NETWORK_PATH, "adjacency")
 
 class AdjMatrix:
 
-    def __init__(self, row_vertices: list, col_vertices: list or None, tuple_key: Tuple,
-                 file_prefix: str = "adj", initial_value: int = -42):
+    def __init__(self, row_vertices: Sequence, col_vertices: Sequence or None, tuple_key: Tuple,
+                 file_prefix: str = "adj", initial_value: int = -42, arr_initializer: np.ndarray = None):
 
         self.is_row_col_same = col_vertices is None
 
-        self.row_vertices = np.asarray(row_vertices)
-        self.col_vertices = self.row_vertices if self.is_row_col_same else np.asarray(col_vertices)
-
+        self.row_vertices: np.ndarray = np.asarray(row_vertices, dtype=np.int64)
+        self.col_vertices: np.ndarray = self.row_vertices if self.is_row_col_same \
+                                                          else np.asarray(col_vertices, dtype=np.int64)
         self.tuple_key = tuple_key
         self.row_size = len(self.row_vertices)
         self.col_size = len(self.col_vertices)
         self.initial_value = initial_value
         self.file_prefix = file_prefix
 
-        self.arr = np.full((self.row_size, self.col_size), self.initial_value)
+        if arr_initializer:
+            self.arr = arr_initializer
+        else:
+            self.arr = np.full((self.row_size, self.col_size), self.initial_value, dtype=np.int64)
+
+        assert self.arr.shape == (self.row_size, self.col_size)
 
     def __getitem__(self, item):
         return self.arr.__getitem__(item)
@@ -58,6 +63,55 @@ class AdjMatrix:
         file = file if file else self.get_file_name(self.tuple_key)
         self._arr_load(file)
         self._meta_load(file)
+
+    @classmethod
+    def load_and_merge(cls, file_prefix, batch_num):
+
+        full_mat = None
+        row_vertices, col_vertices = cls.load_vertices(file_prefix, batch_num)
+
+        for i in range(batch_num):
+
+            one_row = None
+            for j in range(batch_num):
+                tuple_key = (i, j, batch_num)
+                adj = AdjMatrix(row_vertices=[], col_vertices=[], tuple_key=tuple_key, file_prefix=file_prefix)
+                adj.load()
+
+                if one_row is None:
+                    one_row = np.ndarray(shape=(adj.row_size, 0), dtype=np.int64)
+                # (r, n*m) @ (r, m) -> (r, (n+1)*m)
+                one_row = np.concatenate((one_row, adj.arr), axis=1)
+
+            if full_mat is None:
+                full_mat = np.ndarray(shape=(0, one_row.shape[1]), dtype=np.int64)
+            # (n*m, c) @ (m, c) -> ((n+1)*m, c)
+            full_mat = np.concatenate((full_mat, one_row))
+            print(full_mat)
+
+        adj = AdjMatrix(row_vertices=row_vertices, col_vertices=col_vertices, tuple_key=(0, 0, 1),
+                        file_prefix=file_prefix, arr_initializer=full_mat)
+        return adj
+
+    @classmethod
+    def load_vertices(cls, file_prefix, batch_num):
+        row_vertices, col_vertices = np.asarray([], dtype=np.int64), np.asarray([], dtype=np.int64)
+
+        for i in range(batch_num):
+            tuple_key = (i, 0, batch_num)
+            adj = AdjMatrix(row_vertices=[], col_vertices=[], tuple_key=tuple_key, file_prefix=file_prefix,
+                            arr_initializer=np.zeros((1,)))
+            adj._meta_load(adj.get_file_name(tuple_key))
+            row_vertices = np.concatenate((row_vertices, adj.row_vertices))
+
+        for j in range(batch_num):
+            tuple_key = (0, j, batch_num)
+            adj = AdjMatrix(row_vertices=[], col_vertices=[], tuple_key=tuple_key, file_prefix=file_prefix,
+                            arr_initializer=np.zeros((1,)))
+            adj._meta_load(adj.get_file_name(tuple_key))
+            col_vertices = np.concatenate((col_vertices, adj.col_vertices))
+
+        return row_vertices, col_vertices
 
     def _arr_dump(self, file):
         self.arr.dump(os.path.join(ADJ_PATH, file))
@@ -120,7 +174,6 @@ class AdjMatrixAPIWrapper(TwitterAPIWrapper):
                         file_prefix=self.file_prefix, initial_value=self.initial_value)
 
         for i, u in enumerate(row_vertices_batch):
-            print("one", i)
             relations = self.get_sft_and_tfs_async_batch(st_pairs=[(u, v) for v in row_vertices_batch[i:]])
             for j, (u_follows_v, v_follows_u) in enumerate(relations):
                 j = j + i
@@ -138,7 +191,6 @@ class AdjMatrixAPIWrapper(TwitterAPIWrapper):
                           file_prefix=self.file_prefix, initial_value=self.initial_value)
 
         for i, u in enumerate(row_vertices_batch):
-            print("pair", i)
             relations = self.get_sft_and_tfs_async_batch(st_pairs=[(u, v) for v in col_vertices_batch])
             for j, (u_follows_v, v_follows_u) in enumerate(relations):
                 mat[i][j] = u_follows_v
@@ -238,7 +290,6 @@ class AdjMatrixFromNetwork:
 
 
 def get_adj_matrix_from_user_network(friend_file, follower_file, batch_size=10000):
-
     friend_network = UserNetwork()
     friend_network.load(friend_file)
     user_id_to_friend_ids = friend_network.user_id_to_friend_ids
@@ -285,7 +336,7 @@ if __name__ == '__main__':
 
     elif MODE == "TINY":
         user_set = load_user_set("tiny_one_user_set_follower.pkl")
-        matrix_api = AdjMatrixAPIWrapper(given_config_file_path_list, batch_size=25, file_prefix="tiny_adj")
+        matrix_api = AdjMatrixAPIWrapper(given_config_file_path_list, batch_size=100, file_prefix="tiny_adj")
         matrix_api.set_vertices(user_set, sorting=False)
         matrix_api.get_matrices()
 
