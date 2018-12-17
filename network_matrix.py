@@ -121,8 +121,9 @@ class AdjMatrixAPIWrapper(TwitterAPIWrapper):
 
         for i, u in enumerate(row_vertices_batch):
             print("one", i)
-            for j, v in enumerate(row_vertices_batch[i:]):
-                u_follows_v, v_follows_u = self.get_sft_and_tfs(u, v)
+            relations = self.get_sft_and_tfs_async_batch(st_pairs=[(u, v) for v in row_vertices_batch[i:]])
+            for j, (u_follows_v, v_follows_u) in enumerate(relations):
+                j = j + i
                 mat[i][j] = u_follows_v
                 mat[j][i] = v_follows_u
 
@@ -138,8 +139,8 @@ class AdjMatrixAPIWrapper(TwitterAPIWrapper):
 
         for i, u in enumerate(row_vertices_batch):
             print("pair", i)
-            for j, v in enumerate(col_vertices_batch):
-                u_follows_v, v_follows_u = self.get_sft_and_tfs(u, v)
+            relations = self.get_sft_and_tfs_async_batch(st_pairs=[(u, v) for v in col_vertices_batch])
+            for j, (u_follows_v, v_follows_u) in enumerate(relations):
                 mat[i][j] = u_follows_v
                 mat_t[j][i] = v_follows_u
 
@@ -271,7 +272,7 @@ def get_test_user_set():
 
 if __name__ == '__main__':
 
-    MODE = "FROM_NETWORK"
+    MODE = "TINY"
     start_time = time.time()
 
     given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
@@ -284,7 +285,7 @@ if __name__ == '__main__':
 
     elif MODE == "TINY":
         user_set = load_user_set("tiny_one_user_set_follower.pkl")
-        matrix_api = AdjMatrixAPIWrapper(given_config_file_path_list, batch_size=20, file_prefix="tiny_adj")
+        matrix_api = AdjMatrixAPIWrapper(given_config_file_path_list, batch_size=25, file_prefix="tiny_adj")
         matrix_api.set_vertices(user_set, sorting=False)
         matrix_api.get_matrices()
 

@@ -1,4 +1,7 @@
 import threading
+from multiprocessing.pool import ThreadPool
+
+from typing import List, Tuple
 
 import twitter
 import configparser
@@ -16,9 +19,11 @@ class TwitterAPIWrapper:
         self.api, self.apis = None, None
         if self.is_single:
             self.api = self.api_twitter(config_file_path_or_list)
+            self.pool = None
         else:
             self.apis = {self.api_twitter(p): {m: True for m in methods}
                          for p in config_file_path_or_list}
+            self.pool = ThreadPool(processes=len(self.apis))
 
     def api_twitter(self, config_file_path) -> twitter.Api:
         try:
@@ -56,7 +61,7 @@ class TwitterAPIWrapper:
         while not api:
             api = self._get_available_api(method=method)
             if not api:
-                wait_second(check_interval, with_tqdm=True)
+                wait_second(check_interval, with_tqdm=False)
 
         return api
 
@@ -96,7 +101,7 @@ class TwitterAPIWrapper:
             results = api.GetUser(user_id=user_id)
             return results
 
-    def ShowFriendship(self, source_user_id, target_user_id, check_interval=6):
+    def ShowFriendship(self, source_user_id, target_user_id, check_interval=3):
         if self.is_single:
             return self.api.ShowFriendship()
         else:
@@ -105,18 +110,28 @@ class TwitterAPIWrapper:
             results = api.ShowFriendship(source_user_id=source_user_id, target_user_id=target_user_id)
             return results
 
-    def get_sft_and_tfs(self, source_use_id, target_user_id, check_interval=6) -> (int, int):
-        print(source_use_id, target_user_id)
-        if source_use_id == target_user_id:
+    def get_sft_and_tfs(self, source_user_id, target_user_id, check_interval=3) -> (int, int):
+        if source_user_id == target_user_id:
             return 0, 0
         try:
-            relationship = self.ShowFriendship(source_use_id, target_user_id, check_interval=check_interval)
+            relationship = self.ShowFriendship(source_user_id, target_user_id, check_interval=check_interval)
             source_follows_target = relationship["relationship"]["source"]["following"]
             target_follows_source = relationship["relationship"]["target"]["following"]
             return int(source_follows_target), int(target_follows_source)
         except Exception as e:
-            print("Error in get_sft_and_tfs with ({}, {}): ".format(source_use_id, target_user_id), e)
+            print("Error in get_sft_and_tfs with ({}, {}): ".format(source_user_id, target_user_id), e)
             return -1, -1
+
+    def get_sft_and_tfs_async_batch(self, st_pairs: List[Tuple], check_interval=3):
+        results = []
+        for st_pair in st_pairs:
+            async_result = self.pool.apply_async(self.get_sft_and_tfs, kwds={
+                "source_user_id": st_pair[0],
+                "target_user_id": st_pair[1],
+                "check_interval": check_interval,
+            })
+            results.append(async_result)
+        return [r.get() for r in results]
 
     def VerifyCredentials(self):
         try:
