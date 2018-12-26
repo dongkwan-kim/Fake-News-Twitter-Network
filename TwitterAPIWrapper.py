@@ -119,19 +119,38 @@ class TwitterAPIWrapper:
             target_follows_source = relationship["relationship"]["target"]["following"]
             return int(source_follows_target), int(target_follows_source)
         except Exception as e:
-            print("Error in get_sft_and_tfs with ({}, {}): ".format(source_user_id, target_user_id), e)
             return -1, -1
 
-    def get_sft_and_tfs_async_batch(self, st_pairs: List[Tuple], check_interval=3):
+    def get_sft_and_tfs_safe(self, source_user_id, target_user_id, check_interval=3) -> (int, int):
+        sft, tfs = self.get_sft_and_tfs(source_user_id, target_user_id, check_interval)
+        if sft == tfs == -1:
+            is_source_public = is_account_public_for_one(self, source_user_id)
+            is_target_public = is_account_public_for_one(self, target_user_id)
+            if is_source_public and is_target_public:
+                print("First trial error: ({}, {})".format(sft, tfs))
+                sft, tfs = -2, -2
+                while sft != -1 and tfs != -1:
+                    sft, tfs = self.get_sft_and_tfs(source_user_id, target_user_id, check_interval)
+        return sft, tfs
+
+    def get_sft_and_tfs_async_batch(self, st_pairs: List[Tuple], check_interval=3) -> List[Tuple[int, int]]:
         results = []
         for st_pair in st_pairs:
-            async_result = self.pool.apply_async(self.get_sft_and_tfs, kwds={
+            async_result = self.pool.apply_async(self.get_sft_and_tfs_safe, kwds={
                 "source_user_id": st_pair[0],
                 "target_user_id": st_pair[1],
                 "check_interval": check_interval,
             })
             results.append(async_result)
-        return [r.get() for r in results]
+
+        length = len(st_pairs)
+        value_of_results = []
+        for i, r in enumerate(results):
+            value_of_results.append(r.get())
+            if (i+1) % int(length/10) == 0:
+                print("Progress of get_sft_and_tfs_async_batch: {}/{}".format(i+1, length))
+
+        return value_of_results
 
     def VerifyCredentials(self):
         try:
@@ -141,6 +160,20 @@ class TwitterAPIWrapper:
                 return [a.VerifyCredentials() for a in self.apis.keys()]
         except Exception as e:
             return str(e)
+
+
+def is_account_public_for_one(api: TwitterAPIWrapper, user_id):
+    try:
+        u = api.GetUser(user_id=user_id)
+        protected = u.protected
+        if protected:
+            is_public = False
+        else:
+            is_public = True
+    except Exception as e:
+        is_public = False
+
+    return is_public
 
 
 if __name__ == '__main__':

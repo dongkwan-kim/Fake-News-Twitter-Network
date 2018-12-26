@@ -2,7 +2,7 @@
 
 __author__ = 'Dongkwan Kim'
 
-from TwitterAPIWrapper import TwitterAPIWrapper
+from TwitterAPIWrapper import TwitterAPIWrapper, is_account_public_for_one
 from format_event import *
 from format_story import *
 from termcolor import colored, cprint
@@ -194,7 +194,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
                 user_id_to_target_ids[user_id] = target_ids
 
                 if target_ids is None:
-                    if UserNetworkChecker.is_account_public_for_one(self, user_id):
+                    if is_account_public_for_one(self, user_id):
                         cprint("PublicNotCrawledError Found at {}".format(user_id), "red")
                         while target_ids is None:
                             target_ids = fetch_target_ids(user_id)
@@ -300,23 +300,6 @@ class UserNetworkChecker:
         if is_load:
             self.network.load(file_name)
 
-    @staticmethod
-    def is_account_public_for_one(api: TwitterAPIWrapper, user_id):
-        try:
-            u = api.GetUser(user_id=user_id)
-            protected = u.protected
-            if protected:
-                print("{}\t{}".format(user_id, "protected"))
-                is_public = False
-            else:
-                print("{}\t{}".format(user_id, u))
-                is_public = True
-        except Exception as e:
-            print("{}\t{}".format(user_id, e))
-            is_public = False
-
-        return is_public
-
     def is_account_public_for_all(self, user_id_list: list = None) -> Dict[str, bool]:
 
         is_public_list = []
@@ -325,7 +308,7 @@ class UserNetworkChecker:
 
         while user_id_list:
             user_id = user_id_list.pop(0)
-            is_public = self.is_account_public_for_one(self.apis, user_id)
+            is_public = is_account_public_for_one(self.apis, user_id)
             is_public_list.append(is_public)
 
             user_size = len(user_id_list)
