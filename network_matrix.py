@@ -223,18 +223,25 @@ class AdjMatrixAPIWrapper(TwitterAPIWrapper):
 
 class AdjMatrixFromNetwork:
 
-    def __init__(self, user_id_to_friend_ids: dict, user_id_to_follower_ids: dict,
+    def __init__(self, user_id_to_friend_ids: dict, user_id_to_follower_ids: dict or None, marginal_user_set: set,
                  file_prefix: str = "adj", batch_size: int = 10000, initial_value: int = -42, progress: int = None):
 
         self.user_id_to_friend_ids = user_id_to_friend_ids
         self.user_id_to_follower_ids = user_id_to_follower_ids
 
-        self.vertices: list = [int(u) for u in user_id_to_friend_ids.keys() if u != "ROOT"]
+        self.network_vertices: list = [int(u) for u in user_id_to_friend_ids.keys() if u != "ROOT"]
+        self.marginal_vertices: list = sorted(marginal_user_set) if marginal_user_set else None
 
         self.file_prefix = file_prefix
         self.batch_size = batch_size
         self.initial_value = initial_value
         self.row_progress = progress if progress else 0
+
+    def update_user_id_to_follower_ids(self, user_id_to_follower_ids):
+        if not self.user_id_to_follower_ids:
+            self.user_id_to_follower_ids = user_id_to_follower_ids
+        else:
+            print("There is an existing user_id_to_follower_ids of len {}".format(len(self.user_id_to_follower_ids)))
 
     def _dump_one_batch_matrix(self, one_batch_matrix: AdjMatrix, file_name=None):
         one_batch_matrix.dump(file_name)
@@ -244,12 +251,15 @@ class AdjMatrixFromNetwork:
         mat.load()
         return mat
 
-    def get_sft(self, s, t):
+    def get_sft(self, s, t, search_to_ids):
+
+        if not search_to_ids:
+            search_to_ids = self.user_id_to_friend_ids
 
         if s == t:
             return 0
 
-        friend_ids = self.user_id_to_friend_ids[str(s)]
+        friend_ids = search_to_ids[str(s)]
         if friend_ids:
             s_follows_t = int(t in friend_ids)
         else:
@@ -257,56 +267,92 @@ class AdjMatrixFromNetwork:
 
         return s_follows_t
 
-    def _get_batch_matrix(self, row_vertices_batch: list, col_vertices_batch: list, tuple_key: tuple):
+    def _get_batch_matrix(self, row_vertices_batch: list, col_vertices_batch: list, tuple_key: tuple,
+                          search_to_ids=None, file_pre_prefix=""):
 
         mat = AdjMatrix(row_vertices=row_vertices_batch,
                         col_vertices=col_vertices_batch,
                         tuple_key=tuple_key,
-                        file_prefix=self.file_prefix,
+                        file_prefix="{}{}".format(file_pre_prefix, self.file_prefix),
                         initial_value=self.initial_value)
 
         for i, u in enumerate(row_vertices_batch):
             for j, v in enumerate(col_vertices_batch):
-                mat[i][j] = self.get_sft(u, v)
+                mat[i][j] = self.get_sft(u, v, search_to_ids=search_to_ids)
         return mat
 
-    def get_matrices(self):
+    def get_matrices_NetworkXNetwork(self):
 
-        batch_num = round_up_division(len(self.vertices), self.batch_size)
+        batch_num = round_up_division(len(self.network_vertices), self.batch_size)
 
         for row_idx in range(self.row_progress, batch_num):
             for col_idx in range(row_idx, batch_num):
                 tuple_key = (row_idx, col_idx, batch_num)
 
                 row_base = row_idx * self.batch_size
-                row_vertices = self.vertices[row_base:row_base + self.batch_size]
+                row_vertices = self.network_vertices[row_base:row_base + self.batch_size]
 
                 col_base = col_idx * self.batch_size
-                col_vertices = self.vertices[col_base:col_base + self.batch_size]
+                col_vertices = self.network_vertices[col_base:col_base + self.batch_size]
 
                 mat = self._get_batch_matrix(row_vertices, col_vertices, tuple_key)
                 mat.dump()
                 print(mat)
 
+    def _get_matrices_with_marginal(self, row_vertices_all, col_vertices_all, search_to_ids, file_pre_prefix):
 
-def get_adj_matrix_from_user_network(friend_file, follower_file, batch_size=10000):
+        row_batch_num = round_up_division(len(row_vertices_all), self.batch_size)
+        col_batch_num = round_up_division(len(col_vertices_all), self.batch_size)
+
+        for row_idx in range(row_batch_num):
+            for col_idx in range(col_batch_num):
+                tuple_key = (row_idx, col_idx, max(row_batch_num, col_batch_num))
+
+                row_base = row_idx * self.batch_size
+                row_vertices = row_vertices_all[row_base:row_base + self.batch_size]
+
+                col_base = col_idx * self.batch_size
+                col_vertices = col_vertices_all[col_base:col_base + self.batch_size]
+
+                mat = self._get_batch_matrix(row_vertices, col_vertices, tuple_key,
+                                             search_to_ids=search_to_ids, file_pre_prefix=file_pre_prefix)
+                mat.dump()
+                print(mat)
+
+    def get_matrices_NetworkXMarginal(self):
+        self._get_matrices_with_marginal(self.network_vertices, self.marginal_vertices, self.user_id_to_friend_ids,
+                                         file_pre_prefix="NetworkXMarginal_")
+
+    def get_matrices_MarginalXNetwork(self):
+        self._get_matrices_with_marginal(self.network_vertices, self.marginal_vertices, self.user_id_to_follower_ids,
+                                         file_pre_prefix="MarginalXNetwork_")
+
+    def get_matrices_MarginalXDot(self):
+        self.get_matrices_NetworkXMarginal()
+        self.get_matrices_MarginalXNetwork()
+
+
+def get_adj_matrix_from_user_network(friend_file, follower_file, marginal_user_set,
+                                     file_prefix="network_adj", need_follower_load=False, batch_size=10000):
     friend_network = UserNetwork()
     friend_network.load(friend_file)
     user_id_to_friend_ids = friend_network.user_id_to_friend_ids
 
-    """
-    follower_network = UserNetwork()
-    follower_network.load(follower_file)
-    user_id_to_follower_ids = follower_network.user_id_to_follower_ids
-    """
-
     adj_from_network = AdjMatrixFromNetwork(
         user_id_to_friend_ids=user_id_to_friend_ids,
-        user_id_to_follower_ids={},
-        file_prefix="network_adj",
+        user_id_to_follower_ids=None,
+        marginal_user_set=marginal_user_set,
+        file_prefix=file_prefix,
         batch_size=batch_size,
     )
-    adj_from_network.get_matrices()
+
+    if need_follower_load:
+        follower_network = UserNetwork()
+        follower_network.load(follower_file)
+        user_id_to_follower_ids = follower_network.user_id_to_follower_ids
+        adj_from_network.update_user_id_to_follower_ids(user_id_to_follower_ids)
+
+    return adj_from_network
 
 
 def get_test_user_set():
@@ -323,7 +369,7 @@ def get_test_user_set():
 
 if __name__ == '__main__':
 
-    MODE = "TINY"
+    MODE = "TEST_AS_MARGINAL"
     start_time = time.time()
 
     given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
@@ -334,6 +380,19 @@ if __name__ == '__main__':
         matrix_api.set_vertices(user_set, sorting=True)
         matrix_api.get_matrices()
 
+    elif MODE == "TEST_AS_MARGINAL":
+        user_set = get_test_user_set()
+        adj = get_adj_matrix_from_user_network(
+            friend_file="UserNetwork_friends.pkl",
+            follower_file=None,
+            marginal_user_set=user_set,
+            file_prefix="test_marginal_adj",
+            need_follower_load=True
+        )
+        print(adj.network_vertices[:10])
+        print(adj.marginal_vertices[:10])
+        adj.get_matrices_MarginalXDot()
+
     elif MODE == "TINY":
         user_set = load_user_set("tiny_one_user_set_follower.pkl")
         matrix_api = AdjMatrixAPIWrapper(given_config_file_path_list, batch_size=100, file_prefix="tiny_adj")
@@ -341,7 +400,27 @@ if __name__ == '__main__':
         matrix_api.get_matrices()
 
     elif MODE == "FROM_NETWORK":
-        get_adj_matrix_from_user_network("UserNetwork_friends.pkl", None)
+        adj = get_adj_matrix_from_user_network("UserNetwork_friends.pkl", None, None)
+        adj.get_matrices_NetworkXNetwork()
+
+    elif MODE == "FROM_SAMPLE":
+        user_set = load_user_set("sampled_not_propagated_user_set_follower_0.pkl")
+        matrix_api = AdjMatrixAPIWrapper(given_config_file_path_list, batch_size=10000, file_prefix="sample_adj")
+        matrix_api.set_vertices(user_set, sorting=True)
+        matrix_api.get_matrices()
+
+    elif MODE == "FROM_MARGINAL":
+        user_set = load_user_set("sampled_not_propagated_user_set_follower_0.pkl")
+        adj = get_adj_matrix_from_user_network(
+            friend_file="UserNetwork_friends.pkl",
+            follower_file=None,
+            marginal_user_set=user_set,
+            file_prefix="marginal_adj",
+            need_follower_load=True
+        )
+        print(adj.network_vertices[:10])
+        print(adj.marginal_vertices[:10])
+        adj.get_matrices_MarginalXDot()
 
     total_consumed_secs = time.time() - start_time
     print('Total {0}h {1}m {2}s consumed'.format(
