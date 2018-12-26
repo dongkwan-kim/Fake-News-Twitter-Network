@@ -2,6 +2,7 @@ import os
 from typing import Set
 
 import pickle
+import numpy as np
 
 from termcolor import cprint
 
@@ -130,9 +131,18 @@ def get_user_set_minus_propagated_user_set():
     dump_user_set_distributively(user_set-propagated_user_set, "not_propagated_user_set_follower", 2)
 
 
+def sample_user_set(original_file, sample_num):
+    user_ndarray = np.asarray(list(load_user_set_distributively(original_file)))
+    permutation = np.random.permutation(user_ndarray.size)
+    indices = permutation[:sample_num]
+    sampled = set(user_ndarray[indices])
+    dump_user_set_distributively(sampled, "sampled_{}".format(original_file), 1)
+    return sampled
+
+
 if __name__ == '__main__':
 
-    MODE = "MINUS_PROPAGATED"
+    MODE = "SAMPLE_USER_SET"
 
     what_to_crawl_in_main = "follower"
     main_file_name = "UserNetwork_friends.pkl" if what_to_crawl_in_main == "friend" else None
@@ -155,3 +165,6 @@ if __name__ == '__main__':
 
     elif MODE == "MINUS_PROPAGATED":
         get_user_set_minus_propagated_user_set()
+
+    elif MODE == "SAMPLE_USER_SET":
+        sample_user_set("not_propagated_user_set_follower", int(79416/4))
