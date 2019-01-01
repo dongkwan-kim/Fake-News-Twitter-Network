@@ -5,6 +5,7 @@ __author__ = 'Dongkwan Kim'
 from TwitterAPIWrapper import TwitterAPIWrapper, is_account_public_for_one
 from format_event import *
 from format_story import *
+from user_set import *
 from termcolor import colored, cprint
 from utill import *
 from typing import List, Dict
@@ -42,8 +43,8 @@ class UserNetwork:
             self.dump_file_id if self.dump_file_id else os.getpid(),
         ), color))
 
-    def _sliced_dump(self, slice_id: int):
-        file_name = "SlicedUserNetwork_{0}.pkl".format(str(slice_id))
+    def _sliced_dump(self, slice_id: int, file_prefix="SlicedUserNetwork"):
+        file_name = "{}_{}.pkl".format(file_prefix, str(slice_id))
         with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
             pickle.dump(self, f)
 
@@ -79,8 +80,7 @@ class UserNetwork:
         try:
             if not file_name:
                 file_name = "UserNetwork.pkl"
-                target_file_list = [f for f in os.listdir(NETWORK_PATH)
-                                    if "SlicedUserNetwork" in f or "UserNetwork.pkl" in f]
+                target_file_list = [f for f in os.listdir(NETWORK_PATH) if "SlicedUserNetwork" in f]
                 if not target_file_list:
                     raise FileNotFoundError
                 for i, network_file in enumerate(target_file_list):
@@ -357,11 +357,69 @@ class UserNetworkChecker:
         _user_network_api.get_and_dump_user_network(file_name=file_name, with_load=False, save_point=save_point)
 
 
+def prune_networks(network_list: List[UserNetwork]) -> UserNetwork:
+    """
+    :param network_list: list of UserNetwork
+    :return: UserNetwork that users who are not in keys of UserNetwork are removed
+    """
+    real_user_set = set()
+    for net in network_list:
+        real_user_set.update(net.user_id_to_friend_ids.keys())
+        real_user_set.update(net.user_id_to_follower_ids.keys())
+    real_user_set = {int(u) for u in real_user_set}
+    cprint("Load user_set: {}".format(len(real_user_set)), "green")
+
+    network_to_prune = UserNetwork()
+    error_user_set = set()
+    for net in network_list:
+
+        for i, (user_with_friend, friends) in enumerate(net.user_id_to_friend_ids.items()):
+
+            user_with_friend = int(user_with_friend)
+
+            if friends is None:
+                pruned_friends = None
+                error_user_set.add(user_with_friend)
+            else:
+                pruned_friends = [f for f in friends if f in real_user_set]
+
+            network_to_prune.user_id_to_friend_ids[user_with_friend] = pruned_friends
+
+            if (i+1) % 10000 == 0:
+                print("Friend Progress: {}".format(i+1))
+
+        for i, (user_with_follower, followers) in enumerate(net.user_id_to_follower_ids.items()):
+
+            user_with_follower = int(user_with_follower)
+
+            if followers is None:
+                pruned_followers = None
+                error_user_set.add(user_with_follower)
+            else:
+                pruned_followers = [f for f in followers if f in real_user_set]
+
+            network_to_prune.user_id_to_follower_ids[user_with_follower] = pruned_followers
+
+            if (i+1) % 10000 == 0:
+                print("Follower Progress: {}".format(i+1))
+
+    network_to_prune.user_set = real_user_set
+    network_to_prune.error_user_set = error_user_set
+
+    return network_to_prune
+
+
 if __name__ == '__main__':
 
-    MODE = 'CHECK_AND_REFILL'
-    what_to_crawl_in_main = "friend"
-    main_file_name = "UserNetwork_friends.pkl" if what_to_crawl_in_main == "friend" else None
+    MODE = 'PRUNE_NETWORKS'
+    what_to_crawl_in_main = "pruned"
+    if what_to_crawl_in_main == "friend":
+        main_file_name = "UserNetwork_friends.pkl"
+    elif what_to_crawl_in_main == "follower":
+        main_file_name = None
+    else:
+        main_file_name = "PrunedUserNetwork.pkl"
+
     start_time = time.time()
 
     user_set_from_fe = None
@@ -402,6 +460,21 @@ if __name__ == '__main__':
             file_name=main_file_name,
         )
         checker.refill_unexpected_error_users(file_name=main_file_name, save_point=1000)
+
+    elif MODE == "PRUNE_NETWORKS":
+        network_files = [
+            None,
+            "UserNetwork_friends.pkl",
+            "SampledUserNetwork_follower.pkl",
+            "SampledUserNetwork_friends.pkl",
+        ]
+        user_network_instances = []
+        for net_file_name in network_files:
+            user_network = UserNetwork()
+            user_network.load(file_name=net_file_name)
+            user_network_instances.append(user_network)
+        pruned_network = prune_networks(user_network_instances)
+        pruned_network.dump("PrunedUserNetwork.pkl")
 
     else:
         user_network = UserNetwork()
