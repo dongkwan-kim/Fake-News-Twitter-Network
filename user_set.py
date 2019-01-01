@@ -167,4 +167,4 @@ if __name__ == '__main__':
         get_user_set_minus_propagated_user_set()
 
     elif MODE == "SAMPLE_USER_SET":
-        sample_user_set("not_propagated_user_set_follower", int(79416/4))
+        sample_user_set("not_propagated_user_set_follower", int(79416*2))
