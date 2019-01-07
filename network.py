@@ -409,9 +409,41 @@ def prune_networks(network_list: List[UserNetwork]) -> UserNetwork:
     return network_to_prune
 
 
+def fill_adjacency_from_events(base_network: UserNetwork):
+    event_file_name = "FormattedEventNotIndexify.pkl"
+    events = get_formatted_events(
+        get_formatted_stories().tweet_id_to_story_id,
+        event_file_name=event_file_name,
+        force_save=False,
+        indexify=False,
+    )
+    events.dump(event_file_name)
+
+    for parent, children in events.parent_to_children.items():
+        # By nature, children must follow parent
+
+        if parent == "ROOT":
+            continue
+
+        # == parent is a friend of children
+        for child in children:
+            if base_network.user_id_to_friend_ids[child] is None:
+                base_network.user_id_to_friend_ids[child] = []
+            friends_of_child = base_network.user_id_to_friend_ids[child] + [parent]
+            base_network.user_id_to_friend_ids[child] = list(set(friends_of_child))
+
+        # == children are followers of parent
+        if base_network.user_id_to_follower_ids[parent] is None:
+            base_network.user_id_to_follower_ids[parent] = []
+        followers_of_parent = base_network.user_id_to_follower_ids[parent] + children
+        base_network.user_id_to_follower_ids[parent] = list(set(followers_of_parent))
+
+    return base_network
+
+
 if __name__ == '__main__':
 
-    MODE = 'PRUNE_NETWORKS'
+    MODE = 'FILL_ADJ_FROM_EVENTS'
     what_to_crawl_in_main = "pruned"
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -475,6 +507,12 @@ if __name__ == '__main__':
             user_network_instances.append(user_network)
         pruned_network = prune_networks(user_network_instances)
         pruned_network.dump("PrunedUserNetwork.pkl")
+
+    elif MODE == "FILL_ADJ_FROM_EVENTS":
+        user_network = UserNetwork()
+        user_network.load(file_name=main_file_name)
+        result_network = fill_adjacency_from_events(user_network)
+        result_network.dump("FilledPrunedUserNetwork.pkl")
 
     else:
         user_network = UserNetwork()
