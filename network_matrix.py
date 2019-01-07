@@ -1,3 +1,4 @@
+from TwitterAPIWrapper import TwitterAPIWrapper
 from network import *
 from typing import Sequence, Tuple
 from user_set import load_user_set
