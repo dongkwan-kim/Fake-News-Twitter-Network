@@ -114,25 +114,29 @@ class AdjMatrix:
 
         return row_vertices, col_vertices
 
-    def _arr_dump(self, file):
-        self.arr.dump(os.path.join(ADJ_PATH, file))
+    def _arr_dump(self, file, adj_path=None):
+        adj_path = adj_path or ADJ_PATH
+        self.arr.dump(os.path.join(adj_path, file))
         cprint("Batch Dumped: {}".format(file), "blue")
 
-    def _arr_load(self, file):
-        loaded = np.load(os.path.join(ADJ_PATH, file))
+    def _arr_load(self, file, adj_path=None):
+        adj_path = adj_path or ADJ_PATH
+        loaded = np.load(os.path.join(adj_path, file))
         self.arr = loaded
         cprint("Batch Loaded: {}".format(file), "green")
         return loaded
 
-    def _meta_load(self, file):
-        with open(os.path.join(ADJ_PATH, "meta_{}".format(file)), 'rb') as f:
+    def _meta_load(self, file, adj_path=None):
+        adj_path = adj_path or ADJ_PATH
+        with open(os.path.join(adj_path, "meta_{}".format(file)), 'rb') as f:
             loaded_meta = pickle.load(f)
             for k, v in loaded_meta.items():
                 setattr(self, k, v)
         cprint("Meta Loaded: {}".format(file), "blue")
 
-    def _meta_dump(self, file):
-        with open(os.path.join(ADJ_PATH, "meta_{}".format(file)), 'wb') as f:
+    def _meta_dump(self, file, adj_path=None):
+        adj_path = adj_path or ADJ_PATH
+        with open(os.path.join(adj_path, "meta_{}".format(file)), 'wb') as f:
             pickle.dump({
                 "is_row_col_same": self.is_row_col_same,
                 "row_vertices": self.row_vertices,

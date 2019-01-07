@@ -14,7 +14,7 @@ try:
 except:
     pass
 
-DATA_PATH = './'
+DATA_PATH = os.path.dirname(os.path.abspath(__file__))
 STORY_PATH = os.path.join(DATA_PATH, 'data_story')
 
 
@@ -32,11 +32,12 @@ def get_stops():
     return stop_words, stop_sentences
 
 
-def get_story_files():
-    return [os.path.join(STORY_PATH, f) for f in os.listdir(STORY_PATH) if 'csv' in f]
+def get_story_files(story_path=None):
+    story_path = story_path or STORY_PATH
+    return [os.path.join(story_path, f) for f in os.listdir(story_path) if 'csv' in f]
 
 
-class FormattedStoryElement:
+class BOWStoryElement:
 
     def __init__(self, story_label: str, word_ids_with_duplicates: list):
         """
@@ -51,7 +52,7 @@ class FormattedStoryElement:
         self.word_id_to_cnt = dict(Counter(word_ids_with_duplicates))
 
 
-class FormattedStory:
+class BOWStory:
 
     def __init__(self, story_path_list, stemmer=PorterStemmer, delimiter='\s', len_criteria=None, wf_criteria=None,
                  story_order='original', force_save=False):
@@ -107,17 +108,19 @@ class FormattedStory:
         self.len_criteria = None
         self.wf_criteria = None
 
-    def dump(self):
+    def dump(self, story_path=None):
         file_name = 'FormattedStory_{}.pkl'.format(self.get_twitter_year())
-        with open(os.path.join(STORY_PATH, file_name), 'wb') as f:
+        story_path = story_path or STORY_PATH
+        with open(os.path.join(story_path, file_name), 'wb') as f:
             self.clear_lambda()
             pickle.dump(self, f)
         print('Dumped: {0}'.format(file_name))
 
-    def load(self):
+    def load(self, story_path=None):
         file_name = 'FormattedStory_{}.pkl'.format(self.get_twitter_year())
         try:
-            with open(os.path.join(STORY_PATH, file_name), 'rb') as f:
+            story_path = story_path or STORY_PATH
+            with open(os.path.join(story_path, file_name), 'rb') as f:
                 loaded = pickle.load(f)
                 self.FormattedStoryElement_list = loaded.FormattedStoryElement_list
                 self.word_to_id = loaded.word_to_id
@@ -202,7 +205,7 @@ class FormattedStory:
         story_id_to_word_ids = {story_id: [word_to_id[word] for word in contents]
                                 for story_id, contents in story_id_to_contents.items()}
 
-        self.FormattedStoryElement_list = [FormattedStoryElement(story_id_to_label[story_id], word_ids)
+        self.FormattedStoryElement_list = [BOWStoryElement(story_id_to_label[story_id], word_ids)
                                            for story_id, word_ids in story_id_to_word_ids.items()]
         self.word_to_id = word_to_id
         self.id_to_word = id_to_word
@@ -219,8 +222,8 @@ class FormattedStory:
         return None
 
 
-def get_formatted_stories(force_save=False) -> FormattedStory:
-    fs = FormattedStory(get_story_files(), force_save=force_save)
+def get_formatted_stories(force_save=False) -> BOWStory:
+    fs = BOWStory(get_story_files(), force_save=force_save)
     fs.get_formatted()
     return fs
 

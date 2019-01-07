@@ -12,14 +12,16 @@ SIZE_LIMIT = 10000 * 10000
 USER_SET_PATH = os.path.join(NETWORK_PATH, "user_set")
 
 
-def dump_user_set(user_set, file):
-    with open(os.path.join(USER_SET_PATH, file), 'wb') as f:
+def dump_user_set(user_set, file, user_set_path=None):
+    user_set_path = user_set_path or USER_SET_PATH
+    with open(os.path.join(user_set_path, file), 'wb') as f:
         pickle.dump(user_set, f)
     cprint("Dump user set: {} in {} users".format(file, len(user_set)), "blue")
 
 
-def load_user_set(file):
-    with open(os.path.join(USER_SET_PATH, file), 'rb') as f:
+def load_user_set(file, user_set_path=None):
+    user_set_path = user_set_path or USER_SET_PATH
+    with open(os.path.join(user_set_path, file), 'rb') as f:
         loaded_user_set = pickle.load(f)
         cprint("Load user set: {} in {} users".format(file, len(loaded_user_set)), "green")
         return loaded_user_set
@@ -35,9 +37,10 @@ def dump_user_set_distributively(user_set, file_prefix, number=3):
         base += size
 
 
-def load_user_set_distributively(file_prefix):
+def load_user_set_distributively(file_prefix, user_set_path=None):
+    user_set_path = user_set_path or USER_SET_PATH
     user_list = []
-    for i, file in enumerate([f for f in os.listdir(USER_SET_PATH) if f.startswith(file_prefix)]):
+    for i, file in enumerate([f for f in os.listdir(user_set_path) if f.startswith(file_prefix)]):
         sub_user_set = load_user_set(file)
         user_list += list(sub_user_set)
     return set(user_list)
@@ -80,9 +83,10 @@ def get_unique_user_partition_set_from_network(file_name: str, what_to_crawl: st
     print("Total length: {}".format(total_length))
 
 
-def reduce_user_partition(what_to_crawl, new_limit):
+def reduce_user_partition(what_to_crawl, new_limit, user_set_path=None):
+    user_set_path = user_set_path or USER_SET_PATH
 
-    file_list = sorted([f for f in os.listdir(USER_SET_PATH)
+    file_list = sorted([f for f in os.listdir(user_set_path)
                         if what_to_crawl in f and f.startswith("user_set")])
 
     total_user_set = set()
@@ -102,8 +106,10 @@ def reduce_user_partition(what_to_crawl, new_limit):
 
 
 def reduce_to_one_and_dump_distributively(what_to_crawl, file_prefix,
-                                          file_prefix_to_merge="reduced_user_set", number=2):
-    file_list = sorted([f for f in os.listdir(USER_SET_PATH)
+                                          file_prefix_to_merge="reduced_user_set", number=2,
+                                          user_set_path=None):
+    user_set_path = user_set_path or USER_SET_PATH
+    file_list = sorted([f for f in os.listdir(user_set_path)
                         if what_to_crawl in f and f.startswith(file_prefix_to_merge)])
 
     total_user_set = set()

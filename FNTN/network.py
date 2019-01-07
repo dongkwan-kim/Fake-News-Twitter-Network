@@ -7,15 +7,17 @@ from FNTN.utill import *
 import os
 import pickle
 
-DATA_PATH = './'
-NETWORK_PATH = os.path.join(DATA_PATH, 'data_network')
+NETWORK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_network')
 
 
 class UserNetwork:
 
-    def __init__(self, dump_file_id: int = None,
-                 user_id_to_follower_ids: dict = None, user_id_to_friend_ids: dict = None,
-                 user_set: set = None, error_user_set: set = None):
+    def __init__(self,
+                 user_id_to_follower_ids: dict = None,
+                 user_id_to_friend_ids: dict = None,
+                 user_set: set = None,
+                 error_user_set: set = None,
+                 dump_file_id: int = None):
         """
         :param user_id_to_follower_ids: collection of user IDs for every user following the key-user.
         :param user_id_to_friend_ids: collection of user IDs for every user the key-user is following.
@@ -36,13 +38,13 @@ class UserNetwork:
             self.dump_file_id if self.dump_file_id else os.getpid(),
         ), color))
 
-    def _sliced_dump(self, slice_id: int, file_prefix="SlicedUserNetwork"):
+    def _sliced_dump(self, slice_id: int, network_path: str, file_prefix="SlicedUserNetwork"):
         file_name = "{}_{}.pkl".format(file_prefix, str(slice_id))
-        with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
+        with open(os.path.join(network_path, file_name), 'wb') as f:
             pickle.dump(self, f)
 
-    def dump(self, given_file_name: str = None, file_slice: int = 11):
-        dump_file_id_str = ('_' + str(self.dump_file_id)) if self.dump_file_id else ''
+    def dump(self, given_file_name: str = None, file_slice: int = 11, network_path=None):
+        network_path = network_path or NETWORK_PATH
         if not given_file_name:
             file_name = "SlicedUserNetwork_*.pkl"
             for slice_idx in range(file_slice):
@@ -55,15 +57,15 @@ class UserNetwork:
                     user_set={u for i, u in enumerate(self.user_set) if i % file_slice == slice_idx},
                     error_user_set={u for i, u in enumerate(self.error_user_set) if i % file_slice == slice_idx},
                 )
-                sliced_network._sliced_dump(slice_idx)
+                sliced_network._sliced_dump(slice_idx, network_path=network_path)
         else:
-            file_name = given_file_name or 'UserNetwork{0}.pkl'.format(dump_file_id_str)
-            with open(os.path.join(NETWORK_PATH, file_name), 'wb') as f:
+            file_name = given_file_name
+            with open(os.path.join(network_path, file_name), 'wb') as f:
                 pickle.dump(self, f)
         self.print_info('Dumped', file_name, 'blue')
 
-    def _sliced_load(self, file_name: str):
-        with open(os.path.join(NETWORK_PATH, file_name), 'rb') as f:
+    def _sliced_load(self, file_name: str, network_path: str):
+        with open(os.path.join(network_path, file_name), 'rb') as f:
             loaded: UserNetwork = pickle.load(f)
             self.dump_file_id = loaded.dump_file_id
             self.user_id_to_follower_ids = merge_dicts(self.user_id_to_follower_ids, loaded.user_id_to_follower_ids)
@@ -71,18 +73,19 @@ class UserNetwork:
             self.user_set.update(loaded.user_set)
             self.error_user_set.update(loaded.error_user_set)
 
-    def load(self, file_name: str = None):
+    def load(self, file_name: str = None, network_path=None):
         try:
+            network_path = network_path or NETWORK_PATH
             if not file_name:
                 file_name = "UserNetwork.pkl"
-                target_file_list = [f for f in os.listdir(NETWORK_PATH) if "SlicedUserNetwork" in f]
+                target_file_list = [f for f in os.listdir(network_path) if "SlicedUserNetwork" in f]
                 if not target_file_list:
                     raise FileNotFoundError
                 for i, network_file in enumerate(target_file_list):
-                    self._sliced_load(network_file)
+                    self._sliced_load(network_file, network_path=network_path)
                     self.print_info("SlicedLoaded ({}/{})".format(i+1, len(target_file_list)), network_file, "green")
             else:
-                self._sliced_load(file_name)
+                self._sliced_load(file_name, network_path=network_path)
             self.print_info('Loaded', file_name, 'green')
             return True
         except Exception as e:

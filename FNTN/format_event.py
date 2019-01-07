@@ -1,4 +1,4 @@
-from FNTN.format_story import *
+from FNTN.story_bow import *
 import pandas as pd
 from collections import defaultdict
 from typing import Callable
@@ -6,11 +6,12 @@ import os
 import pprint
 import pickle
 
-EVENT_PATH = './data_event'
+EVENT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_event')
 
 
-def get_event_files():
-    return [os.path.join(EVENT_PATH, f) for f in os.listdir(EVENT_PATH) if 'csv' in f]
+def get_event_files(event_path=None):
+    event_path = event_path or EVENT_PATH
+    return [os.path.join(event_path, f) for f in os.listdir(event_path) if 'csv' in f]
 
 
 class FormattedEvent:
@@ -38,16 +39,18 @@ class FormattedEvent:
     def pprint(self):
         pprint.pprint(self.__dict__)
 
-    def dump(self, file_name=None):
+    def dump(self, file_name=None, event_path=None):
         file_name = file_name or 'FormattedEvent_{}.pkl'.format(self.get_twitter_year())
-        with open(os.path.join(EVENT_PATH, file_name), 'wb') as f:
+        event_path = event_path or EVENT_PATH
+        with open(os.path.join(event_path, file_name), 'wb') as f:
             pickle.dump(self, f)
         print('Dumped: {0}'.format(file_name))
 
-    def load(self, file_name=None):
+    def load(self, file_name=None, event_path=None):
         file_name = file_name or 'FormattedEvent_{}.pkl'.format(self.get_twitter_year())
         try:
-            with open(os.path.join(EVENT_PATH, file_name), 'rb') as f:
+            event_path = event_path or EVENT_PATH
+            with open(os.path.join(event_path, file_name), 'rb') as f:
                 loaded: FormattedEvent = pickle.load(f)
                 self.parent_to_children = loaded.parent_to_children
                 self.child_to_parent_and_story = loaded.child_to_parent_and_story
@@ -156,16 +159,18 @@ class FormattedEvent:
         return leaf_users
 
     def indexify(self, target_dict: dict,
-                 key_to_id: dict or Callable, value_to_id: dict or Callable, is_c2ps=False) -> dict:
+                 key_to_id_primitive: dict or Callable,
+                 value_to_id_primitive: dict or Callable,
+                 is_c2ps=False) -> dict:
         """
         :param target_dict: dict {key -> list of values}
-        :param key_to_id: dict or function
-        :param value_to_id: dict or function
+        :param key_to_id_primitive: dict or function
+        :param value_to_id_primitive: dict or function
         :param is_c2ps: is_child_to_parent_and_story
         :return: dict {key_to_id[key] -> list(value_to_id[value])}
         """
-        key_to_id = key_to_id if callable(key_to_id) else lambda k: key_to_id[k]
-        value_to_id = value_to_id if callable(value_to_id) else lambda v: value_to_id[v]
+        key_to_id = key_to_id_primitive if callable(key_to_id_primitive) else (lambda k: key_to_id_primitive[k])
+        value_to_id = value_to_id_primitive if callable(value_to_id_primitive) else (lambda v: value_to_id_primitive[v])
         r_dict = {}
         for key, values in target_dict.items():
             if not is_c2ps:

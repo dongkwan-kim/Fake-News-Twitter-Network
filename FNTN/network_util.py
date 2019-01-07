@@ -4,7 +4,6 @@ __author__ = 'Dongkwan Kim'
 
 from FNTN.TwitterAPIWrapper import TwitterAPIWrapper, is_account_public_for_one
 from FNTN.format_event import *
-from FNTN.format_story import *
 from FNTN.user_set import *
 from FNTN.utill import *
 from termcolor import colored, cprint
@@ -13,8 +12,7 @@ import os
 import shutil
 import time
 
-DATA_PATH = './'
-NETWORK_PATH = os.path.join(DATA_PATH, 'data_network')
+NETWORK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_network')
 
 
 class UserNetworkAPIWrapper(TwitterAPIWrapper):
@@ -52,11 +50,11 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
 
     def _dump_user_network(self, file_name: str = None):
         user_network_for_dumping = UserNetwork(
-            self.dump_file_id,
             self.user_id_to_follower_ids,
             self.user_id_to_friend_ids,
             self.user_set,
             self.error_user_set,
+            self.dump_file_id,
         )
         user_network_for_dumping.dump(file_name)
         return user_network_for_dumping
@@ -182,23 +180,26 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
         )
         return next_cursor, prev_cursor, friend_ids
 
-    def backup(self, get_num_of_crawled_users, len_error_user_set):
+    def backup(self, get_num_of_crawled_users, len_error_user_set, network_path=None):
+
+        network_path = network_path or NETWORK_PATH
+
         # Backup merged file
         new_dir = 'backup_{0}_c{1}_e{2}'.format(
             self.what_to_crawl,
             get_num_of_crawled_users,
             len_error_user_set,
         )
-        os.mkdir(os.path.join(NETWORK_PATH, new_dir))
+        os.mkdir(os.path.join(network_path, new_dir))
 
         if self.what_to_crawl == "friend":
             target_file_list = ["UserNetwork_friends.pkl"]
         else:
-            target_file_list = [f for f in os.listdir(NETWORK_PATH) if "SlicedUserNetwork" in f]
+            target_file_list = [f for f in os.listdir(network_path) if "SlicedUserNetwork" in f]
 
         for target_file in target_file_list:
-            shutil.copyfile(os.path.join(NETWORK_PATH, target_file),
-                            os.path.join(NETWORK_PATH, new_dir, target_file))
+            shutil.copyfile(os.path.join(network_path, target_file),
+                            os.path.join(network_path, new_dir, target_file))
 
 
 class UserNetworkChecker:

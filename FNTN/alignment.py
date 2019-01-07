@@ -8,8 +8,7 @@ import csv
 import pickle
 
 
-DATA_PATH = './'
-ALIGNMENT_PATH = os.path.join(DATA_PATH, 'data_alignment')
+ALIGNMENT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_alignment')
 
 
 def add_user_id(path: str):
