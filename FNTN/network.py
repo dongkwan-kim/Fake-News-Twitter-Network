@@ -2,8 +2,8 @@
 
 __author__ = 'Dongkwan Kim'
 
-from termcolor import colored, cprint
-from utill import *
+from termcolor import colored
+from FNTN.utill import *
 import os
 import pickle
 
@@ -20,8 +20,6 @@ class UserNetwork:
         :param user_id_to_follower_ids: collection of user IDs for every user following the key-user.
         :param user_id_to_friend_ids: collection of user IDs for every user the key-user is following.
         """
-        assert NETWORK_PATH in vars()
-
         self.dump_file_id = dump_file_id  # dump_file_id is legacy
         self.user_id_to_follower_ids: dict = user_id_to_follower_ids or dict()
         self.user_id_to_friend_ids: dict = user_id_to_friend_ids or dict()

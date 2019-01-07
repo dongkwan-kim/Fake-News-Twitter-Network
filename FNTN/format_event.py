@@ -1,4 +1,4 @@
-from format_story import *
+from FNTN.format_story import *
 import pandas as pd
 from collections import defaultdict
 from typing import Callable

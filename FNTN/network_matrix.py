@@ -1,7 +1,7 @@
-from TwitterAPIWrapper import TwitterAPIWrapper
-from network import *
+from FNTN.TwitterAPIWrapper import TwitterAPIWrapper
+from FNTN.network import *
 from typing import Sequence, Tuple
-from user_set import load_user_set
+from FNTN.user_set import load_user_set
 import numpy as np
 
 ADJ_PATH = os.path.join(NETWORK_PATH, "adjacency")

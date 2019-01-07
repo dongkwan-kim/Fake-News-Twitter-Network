@@ -1,10 +1,8 @@
-from utill import get_twitter_id, get_files_with_dir_path, build_hist
-from WriterWrapper import WriterWrapper
+from FNTN.utill import get_twitter_id, get_files_with_dir_path, build_hist, WriterWrapper
 from time import sleep
-from network import UserNetwork
+from FNTN.network import UserNetwork
 from typing import List, Dict, Tuple
 from termcolor import cprint, colored
-from collections import Counter
 import os
 import csv
 import pickle

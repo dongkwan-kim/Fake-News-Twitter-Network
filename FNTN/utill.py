@@ -3,6 +3,8 @@ import os
 import re
 import urllib.request
 import sys
+import csv
+import datetime
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from typing import List
@@ -118,6 +120,26 @@ def slice_set_by_size(given_set: set, sz: int) -> List[set]:
 
 def round_up_division(numerator: int, denominator: int) -> int:
     return int(numerator/denominator) + (numerator % denominator > 0)
+
+
+class WriterWrapper:
+
+    def __init__(self, _filename: str, _fieldnames: list):
+        file_name = (_filename + '_{0}.csv').format(datetime.datetime.now())
+        self.f = open(file_name, 'w', encoding='utf-8')
+        self.wr = csv.DictWriter(self.f, fieldnames=_fieldnames)
+        self.wr.writeheader()
+
+    def write_row(self, dct: dict):
+        self.wr.writerow(dct)
+
+    def close(self):
+        self.f.close()
+
+    def export(self, lines):
+        for line in lines:
+            self.write_row(line)
+        self.close()
 
 
 if __name__ == '__main__':
