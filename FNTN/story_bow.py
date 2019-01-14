@@ -9,6 +9,8 @@ from copy import deepcopy
 import random
 from pprint import pprint
 
+from FNTN.story_feature import get_story_files
+
 try:
     from orderedset import OrderedSet
 except:
@@ -30,11 +32,6 @@ def get_stops():
     stop_words = [sw.strip().lower() for sw in stop_words]
 
     return stop_words, stop_sentences
-
-
-def get_story_files(story_path=None):
-    story_path = story_path or STORY_PATH
-    return [os.path.join(story_path, f) for f in os.listdir(story_path) if 'csv' in f]
 
 
 class BOWStoryElement:
