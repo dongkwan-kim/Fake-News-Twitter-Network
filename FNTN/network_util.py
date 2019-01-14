@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from FNTN.network import get_user_networkx
 
 __author__ = 'Dongkwan Kim'
 
@@ -11,6 +12,7 @@ from typing import List, Dict
 import os
 import shutil
 import time
+import networkx as nx
 
 NETWORK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_network')
 
@@ -356,7 +358,7 @@ def fill_adjacency_from_events(base_network: UserNetwork):
 
 if __name__ == '__main__':
 
-    MODE = 'ELSE'
+    MODE = 'NETWORKX'
     what_to_crawl_in_main = "pruned"
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -426,6 +428,11 @@ if __name__ == '__main__':
         user_network.load(file_name=main_file_name)
         result_network = fill_adjacency_from_events(user_network)
         result_network.dump("FilledPrunedUserNetwork.pkl")
+
+    elif MODE == "NETWORKX":
+        user_networkx = get_user_networkx(user_network_file=main_file_name)
+        print("Total {} nodes".format(user_networkx.number_of_nodes()))
+        print("Total {} edges".format(user_networkx.number_of_edges()))
 
     else:
         user_network = UserNetwork()

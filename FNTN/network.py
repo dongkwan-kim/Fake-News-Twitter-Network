@@ -2,10 +2,11 @@
 
 __author__ = 'Dongkwan Kim'
 
-from termcolor import colored
+from termcolor import colored, cprint
 from FNTN.utill import *
 import os
 import pickle
+import networkx as nx
 
 NETWORK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_network')
 
@@ -101,3 +102,42 @@ class UserNetwork:
 
     def get_num_of_crawled_users(self) -> int:
         return max(len(self.user_id_to_friend_ids.keys()), len(self.user_id_to_follower_ids.keys()))
+
+    def to_networkx(self) -> nx.DiGraph:
+        g = nx.DiGraph()
+
+        # u follows friends
+        for u, friends in self.user_id_to_friend_ids.items():
+            if friends:
+                edges = [(u, f) for f in friends]
+                g.add_edges_from(edges, follow=1)
+
+        # followers follow u
+        for u, followers in self.user_id_to_follower_ids.items():
+            if followers:
+                edges = [(f, u) for f in followers]
+                g.add_edges_from(edges, follow=1)
+
+        g.add_nodes_from(self.user_set)
+
+        return g
+
+
+def get_user_networkx(user_network_file=None, networkx_file=None, path=None):
+    path = path or NETWORK_PATH
+    networkx_file = networkx_file or "UserNetworkX.gpickle"
+    networkx_path_and_file = os.path.join(path, networkx_file)
+    try:
+        g = nx.read_gpickle(networkx_path_and_file)
+        cprint("Loaded: {} with {} nodes and {} edges".format(
+            networkx_path_and_file, g.number_of_nodes(), g.number_of_edges(),
+        ), "green")
+    except FileNotFoundError:
+        network = UserNetwork()
+        network.load(file_name=user_network_file)
+        g = network.to_networkx()
+        nx.write_gpickle(g, networkx_path_and_file)
+        cprint("Dumped: {} with {} nodes and {} edges".format(
+            networkx_path_and_file, g.number_of_nodes(), g.number_of_edges(),
+        ), "blue")
+    return g
