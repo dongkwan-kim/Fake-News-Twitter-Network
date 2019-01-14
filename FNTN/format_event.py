@@ -1,6 +1,7 @@
 import pandas as pd
 from collections import defaultdict
 from typing import Callable, Dict, Tuple, List
+from termcolor import cprint
 import os
 import pprint
 import pickle
@@ -48,7 +49,7 @@ class FormattedEvent:
         event_path = event_path or EVENT_PATH
         with open(os.path.join(event_path, file_name), 'wb') as f:
             pickle.dump(self, f)
-        print('Dumped: {0}'.format(file_name))
+        cprint('Dumped: {0}'.format(file_name), "blue")
 
     def load(self, file_name=None, event_path=None):
         file_name = file_name or 'FormattedEvent_{}.pkl'.format(self.get_twitter_year())
@@ -63,10 +64,10 @@ class FormattedEvent:
                 self.user_to_id = loaded.user_to_id
                 self.tweet_id_to_story_id = loaded.tweet_id_to_story_id
                 self.story_to_events = loaded.story_to_events
-            print('Loaded: {0}'.format(file_name))
+            cprint('Loaded: {0}'.format(file_name), "green")
             return True
         except:
-            print('Load Failed: {0}'.format(file_name))
+            cprint('Load Failed: {0}'.format(file_name), "red")
             return False
 
     def get_formatted(self, file_name=None, path=None, indexify=True):
