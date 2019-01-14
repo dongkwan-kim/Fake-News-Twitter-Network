@@ -1,7 +1,6 @@
-from FNTN.story_bow import *
 import pandas as pd
 from collections import defaultdict
-from typing import Callable
+from typing import Callable, Dict, Tuple, List
 import os
 import pprint
 import pickle
@@ -10,8 +9,12 @@ EVENT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_even
 
 
 def get_event_files(event_path=None):
-    event_path = event_path or EVENT_PATH
-    return [os.path.join(event_path, f) for f in os.listdir(event_path) if 'csv' in f]
+    try:
+        event_path = event_path or EVENT_PATH
+        return [os.path.join(event_path, f) for f in os.listdir(event_path) if 'csv' in f]
+    except FileNotFoundError:
+        print("FileNotFoundError: get_event_files in {}".format(event_path))
+        return []
 
 
 class FormattedEvent:
@@ -32,6 +35,7 @@ class FormattedEvent:
         self.user_to_stories: dict = None
         self.user_to_id: dict = None
         self.tweet_id_to_story_id: dict = tweet_id_to_story_id
+        self.story_to_events: Dict[int, List[Tuple[float, int, int]]] = None
 
     def get_twitter_year(self):
         return 'twitter1516'
@@ -58,15 +62,16 @@ class FormattedEvent:
                 self.user_to_stories = loaded.user_to_stories
                 self.user_to_id = loaded.user_to_id
                 self.tweet_id_to_story_id = loaded.tweet_id_to_story_id
+                self.story_to_events = loaded.story_to_events
             print('Loaded: {0}'.format(file_name))
             return True
         except:
             print('Load Failed: {0}'.format(file_name))
             return False
 
-    def get_formatted(self, file_name=None, indexify=True):
+    def get_formatted(self, file_name=None, path=None, indexify=True):
 
-        if not self.force_save and self.load(file_name=file_name):
+        if not self.force_save and self.load(file_name=file_name, event_path=path):
             return
 
         # DataFrame [* rows x 4 columns]
@@ -76,6 +81,7 @@ class FormattedEvent:
         child_to_parent_and_story = defaultdict(list)
         story_to_users = defaultdict(list)
         user_to_stories = defaultdict(list)
+        story_to_events = defaultdict(list)
 
         user_set = set()
         story_set = set()
@@ -84,11 +90,13 @@ class FormattedEvent:
         for i, event in events.iterrows():
             # parent: user id or ROOT, user: user id, story: tweet id
             parent, user, story = map(str, [event['parent_id'], event['user_id'], event['story_id']])
+            time_stamp = float(event['time_stamp'])
 
             parent_to_children[parent].append(user)
             child_to_parent_and_story[user].append((parent, story))
             story_to_users[story].append(user)
             user_to_stories[user].append(story)
+            story_to_events[story].append((time_stamp, parent, user))
 
             user_set.update([parent, user])
             story_set.add(story)
@@ -114,6 +122,8 @@ class FormattedEvent:
         story_to_users = {story: [user for user in user_list if user not in leaf_users]
                           for story, user_list in story_to_users.items()}
         user_set = set(user for user in user_set if user not in leaf_users)
+        story_to_events = {story: [(t, p, u) for t, p, u in events if p not in leaf_users and u not in leaf_users]
+                           for story, events in story_to_events.items()}
 
         # If self.tweet_id_to_story_id is given, use it. Otherwise use index from sorted(story_set)
         tweet_id_to_story_id = self.tweet_id_to_story_id \
@@ -124,16 +134,18 @@ class FormattedEvent:
         if indexify:
             self.parent_to_children = self.indexify(parent_to_children, user_to_id, user_to_id)
             self.child_to_parent_and_story = self.indexify(
-                child_to_parent_and_story, user_to_id, tweet_id_to_story_id, is_c2ps=True
+                child_to_parent_and_story, user_to_id, tweet_id_to_story_id, dict_type="c2ps"
             )
             self.story_to_users = self.indexify(story_to_users, tweet_id_to_story_id, user_to_id)
             self.user_to_stories = self.indexify(user_to_stories, user_to_id, tweet_id_to_story_id)
+            self.story_to_events = self.indexify(story_to_events, tweet_id_to_story_id, user_to_id, dict_type="s2tpc")
         else:
             to_int = lambda x: (int(x) if x != "ROOT" else "ROOT")
             self.parent_to_children = self.indexify(parent_to_children, to_int, to_int)
-            self.child_to_parent_and_story = self.indexify(child_to_parent_and_story, to_int, to_int, is_c2ps=True)
+            self.child_to_parent_and_story = self.indexify(child_to_parent_and_story, to_int, to_int, dict_type="c2ps")
             self.story_to_users = self.indexify(story_to_users, to_int, to_int)
             self.user_to_stories = self.indexify(user_to_stories, to_int, to_int)
+            self.story_to_events = self.indexify(story_to_events, to_int, to_int, dict_type="s2tpc")
 
         self.user_to_id = user_to_id
 
@@ -161,38 +173,42 @@ class FormattedEvent:
     def indexify(self, target_dict: dict,
                  key_to_id_primitive: dict or Callable,
                  value_to_id_primitive: dict or Callable,
-                 is_c2ps=False) -> dict:
+                 dict_type="normal") -> dict:
         """
         :param target_dict: dict {key -> list of values}
         :param key_to_id_primitive: dict or function
         :param value_to_id_primitive: dict or function
-        :param is_c2ps: is_child_to_parent_and_story
+        :param dict_type:
         :return: dict {key_to_id[key] -> list(value_to_id[value])}
         """
         key_to_id = key_to_id_primitive if callable(key_to_id_primitive) else (lambda k: key_to_id_primitive[k])
         value_to_id = value_to_id_primitive if callable(value_to_id_primitive) else (lambda v: value_to_id_primitive[v])
         r_dict = {}
         for key, values in target_dict.items():
-            if not is_c2ps:
+            if dict_type == "normal":
                 r_dict[key_to_id(key)] = list(map(lambda v: value_to_id(v), values))
-            else:
+            elif dict_type == "c2ps":
                 # c2ps: key:user -> (key:user, value:story)
                 r_dict[key_to_id(key)] = list(map(lambda v: (key_to_id(v[0]), value_to_id(v[1])), values))
+            elif dict_type == "s2tpc":
+                # s2tpc: key:story -> (*, value:user, value:user)
+                r_dict[key_to_id(key)] = list(map(lambda v: (v[0], value_to_id(v[1]), value_to_id(v[2])), values))
         return r_dict
 
 
-def get_formatted_events(tweet_id_to_story_id=None, event_file_name=None,
+def get_formatted_events(tweet_id_to_story_id=None, event_file_name=None, event_file_path=None,
                          force_save=False, indexify=True) -> FormattedEvent:
     fe = FormattedEvent(
         get_event_files(),
         tweet_id_to_story_id=tweet_id_to_story_id,
         force_save=force_save
     )
-    fe.get_formatted(file_name=event_file_name, indexify=indexify)
+    fe.get_formatted(file_name=event_file_name, path=event_file_path, indexify=indexify)
     return fe
 
 
 if __name__ == '__main__':
+    from FNTN.story_bow import get_formatted_stories
     stories = get_formatted_stories()
-    formatted_events = get_formatted_events(stories.tweet_id_to_story_id, force_save=True, indexify=True)
+    formatted_events = get_formatted_events(stories.tweet_id_to_story_id, force_save=True, indexify=False)
     formatted_events.dump()
