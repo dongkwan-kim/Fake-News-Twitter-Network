@@ -39,15 +39,22 @@ class StoryFeature:
         if self.load(file_name, path):
             return
 
+        from spacy.lang.en import English
         import pandas as pd
+
         stories = pd.concat((pd.read_csv(path) for path in self.story_path_list), ignore_index=True)
         stories = stories.drop_duplicates(subset=['tweet_id'])
         stories = stories.reset_index(drop=True)
 
         for i, story in stories.iterrows():
+            story_id = int(story['tweet_id'])
             text = (story['title'] + '\n' + story['content'])
-            self.story_to_attr[i]['text'] = text
-            self.story_to_attr[i]['label'] = story['label']
+            self.story_to_attr[story_id]['text'] = text
+            self.story_to_attr[story_id]['token'] = [t.text for t in English()(text)]
+            self.story_to_attr[story_id]['label'] = story['label']
+
+            if (i + 1) % 100 == 0 and __name__ == '__main__':
+                print("Progress {}".format(i + 1))
 
     def dump(self, file_name, path=None):
         path = path or STORY_PATH
