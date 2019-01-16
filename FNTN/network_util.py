@@ -410,10 +410,10 @@ if __name__ == '__main__':
 
     elif MODE == "PRUNE_NETWORKS":
         network_files = [
-            None,
+            None,  # SlicedUserNetworks for followers
             "UserNetwork_friends.pkl",
-            "SampledUserNetwork_follower.pkl",
-            "SampledUserNetwork_friends.pkl",
+            "UserNetwork_friends_leaves.pkl",
+            "UserNetwork_followers_leaves.pkl",
         ]
         user_network_instances = []
         for net_file_name in network_files:

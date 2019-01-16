@@ -6,6 +6,7 @@ import os
 import pprint
 import pickle
 
+
 EVENT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data_event')
 
 
@@ -70,7 +71,7 @@ class FormattedEvent:
             cprint('Load Failed: {0}'.format(file_name), "red")
             return False
 
-    def get_formatted(self, file_name=None, path=None, indexify=True):
+    def get_formatted(self, file_name=None, path=None, indexify=True, remove_leaves=True):
 
         if not self.force_save and self.load(file_name=file_name, event_path=path):
             return
@@ -105,26 +106,27 @@ class FormattedEvent:
             if i % 10000 == 0 and __name__ == '__main__':
                 print('events.iterrows: {0}'.format(i))
 
-        # Construct a set of leaf users
-        leaf_users = self.get_leaf_user_set(parent_to_children, user_to_stories)
+        if remove_leaves:
+            # Construct a set of leaf users
+            leaf_users = self.get_leaf_user_set(parent_to_children, user_to_stories)
 
-        # Remove leaf users
-        parent_to_children_final = {parent: [child for child in children if child not in leaf_users]
-                                    for parent, children in parent_to_children.items()}
-        parent_to_children = {parent: children
-                              for parent, children in parent_to_children_final.items()
-                              if len(children) != 0}
-        user_to_stories = {user: story_list
-                           for user, story_list in user_to_stories.items()
-                           if user not in leaf_users}
-        child_to_parent_and_story = {child: parent_and_story
-                                     for child, parent_and_story in child_to_parent_and_story.items()
-                                     if child not in leaf_users}
-        story_to_users = {story: [user for user in user_list if user not in leaf_users]
-                          for story, user_list in story_to_users.items()}
-        user_set = set(user for user in user_set if user not in leaf_users)
-        story_to_events = {story: [(t, p, u) for t, p, u in events if p not in leaf_users and u not in leaf_users]
-                           for story, events in story_to_events.items()}
+            # Remove leaf users
+            parent_to_children_final = {parent: [child for child in children if child not in leaf_users]
+                                        for parent, children in parent_to_children.items()}
+            parent_to_children = {parent: children
+                                  for parent, children in parent_to_children_final.items()
+                                  if len(children) != 0}
+            user_to_stories = {user: story_list
+                               for user, story_list in user_to_stories.items()
+                               if user not in leaf_users}
+            child_to_parent_and_story = {child: parent_and_story
+                                         for child, parent_and_story in child_to_parent_and_story.items()
+                                         if child not in leaf_users}
+            story_to_users = {story: [user for user in user_list if user not in leaf_users]
+                              for story, user_list in story_to_users.items()}
+            user_set = set(user for user in user_set if user not in leaf_users)
+            story_to_events = {story: [(t, p, u) for t, p, u in events if p not in leaf_users and u not in leaf_users]
+                               for story, events in story_to_events.items()}
 
         # If self.tweet_id_to_story_id is given, use it. Otherwise use index from sorted(story_set)
         tweet_id_to_story_id = self.tweet_id_to_story_id \
@@ -198,18 +200,28 @@ class FormattedEvent:
 
 
 def get_formatted_events(tweet_id_to_story_id=None, event_file_name=None, event_file_path=None,
-                         force_save=False, indexify=True) -> FormattedEvent:
+                         force_save=False, indexify=True, remove_leaves=True) -> FormattedEvent:
     fe = FormattedEvent(
         get_event_files(),
         tweet_id_to_story_id=tweet_id_to_story_id,
         force_save=force_save
     )
-    fe.get_formatted(file_name=event_file_name, path=event_file_path, indexify=indexify)
+    fe.get_formatted(file_name=event_file_name, path=event_file_path, indexify=indexify, remove_leaves=remove_leaves)
     return fe
 
 
 if __name__ == '__main__':
-    from FNTN.story_bow import get_formatted_stories
+
+    from FNTN.story_bow import get_formatted_stories, BOWStory, BOWStoryElement
+
+    event_file_name_main = "FormattedEvent_with_leaves.pkl"
+
     stories = get_formatted_stories()
-    formatted_events = get_formatted_events(stories.tweet_id_to_story_id, force_save=True, indexify=False)
-    formatted_events.dump()
+    formatted_events = get_formatted_events(
+        stories.tweet_id_to_story_id,
+        event_file_name=event_file_name_main,
+        force_save=True,
+        indexify=False,
+        remove_leaves=False,
+    )
+    formatted_events.dump(event_file_name_main)
