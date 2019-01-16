@@ -4,6 +4,7 @@ from FNTN.network import get_user_networkx
 __author__ = 'Dongkwan Kim'
 
 from FNTN.TwitterAPIWrapper import TwitterAPIWrapper, is_account_public_for_one
+from FNTN.story_bow import *
 from FNTN.format_event import *
 from FNTN.user_set import *
 from FNTN.utill import *
@@ -377,7 +378,7 @@ if __name__ == '__main__':
 
     if MODE == 'API_TEST':
         user_network_api = UserNetworkAPIWrapper(
-            config_file_path='./config/config_01.ini',
+            config_file_path='./FNTN/config/config_01.ini',
             user_set={'836322793', '318956466', '2567151784', '1337170682', '3374714687', '47353139', '23196051'},
             what_to_crawl=what_to_crawl_in_main,
         )
@@ -385,14 +386,14 @@ if __name__ == '__main__':
 
     elif MODE == 'API_RUN':
         user_network_api = UserNetworkAPIWrapper(
-            config_file_path='./config/config_01.ini',
+            config_file_path='./FNTN/config/config_01.ini',
             user_set=user_set_from_fe,
             what_to_crawl=what_to_crawl_in_main,
         )
         user_network_api.get_and_dump_user_network()
 
     elif MODE == 'MP_API_RUN_V2':
-        given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
+        given_config_file_path_list = [os.path.join('FNTN', 'config', f) for f in os.listdir('./FNTN/config') if '.ini' in f]
         user_network_api = UserNetworkAPIWrapper(
             config_file_path=given_config_file_path_list,
             user_set=user_set_from_fe,
@@ -401,7 +402,7 @@ if __name__ == '__main__':
         user_network_api.get_and_dump_user_network(file_name=main_file_name, save_point=1000)
 
     elif MODE == "CHECK_AND_REFILL":
-        given_config_file_path_list = [os.path.join('config', f) for f in os.listdir('./config') if '.ini' in f]
+        given_config_file_path_list = [os.path.join('FNTN', 'config', f) for f in os.listdir('./FNTN/config') if '.ini' in f]
         checker = UserNetworkChecker(
             config_file_path_list=given_config_file_path_list,
             file_name=main_file_name,

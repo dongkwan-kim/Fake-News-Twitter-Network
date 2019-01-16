@@ -126,8 +126,8 @@ class BOWStory:
                 self.story_order = loaded.story_order
             print('Loaded: {0}'.format(file_name))
             return True
-        except:
-            print('Load Failed: {0}'.format(file_name))
+        except Exception as e:
+            print('Load Failed: {0}, {1}'.format(file_name, e))
             return False
 
     def get_formatted(self):
