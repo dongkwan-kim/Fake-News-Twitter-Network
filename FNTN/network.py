@@ -44,10 +44,10 @@ class UserNetwork:
         with open(os.path.join(network_path, file_name), 'wb') as f:
             pickle.dump(self, f)
 
-    def dump(self, given_file_name: str = None, file_slice: int = 11, network_path=None):
+    def dump(self, given_file_name: str = None, file_slice: int = 11, network_path=None, is_sliced=False):
         network_path = network_path or NETWORK_PATH
-        if not given_file_name:
-            file_name = "SlicedUserNetwork_*.pkl"
+        if given_file_name is None or is_sliced:
+            file_name = "SlicedUserNetwork" if given_file_name is None else given_file_name.replace(".pkl", "")
             for slice_idx in range(file_slice):
                 sliced_network = UserNetwork(
                     dump_file_id=None,
@@ -58,7 +58,7 @@ class UserNetwork:
                     user_set={u for i, u in enumerate(self.user_set) if i % file_slice == slice_idx},
                     error_user_set={u for i, u in enumerate(self.error_user_set) if i % file_slice == slice_idx},
                 )
-                sliced_network._sliced_dump(slice_idx, network_path=network_path)
+                sliced_network._sliced_dump(slice_idx, network_path=network_path, file_prefix=file_name)
         else:
             file_name = given_file_name
             with open(os.path.join(network_path, file_name), 'wb') as f:
@@ -74,17 +74,17 @@ class UserNetwork:
             self.user_set.update(loaded.user_set)
             self.error_user_set.update(loaded.error_user_set)
 
-    def load(self, file_name: str = None, network_path=None):
+    def load(self, file_name: str = None, network_path=None, is_sliced=False):
         try:
             network_path = network_path or NETWORK_PATH
-            if not file_name:
-                file_name = "UserNetwork.pkl"
-                target_file_list = [f for f in os.listdir(network_path) if "SlicedUserNetwork" in f]
+            if file_name is None or is_sliced:
+                file_name = "SlicedUserNetwork" if file_name is None else file_name.replace(".pkl", "")
+                target_file_list = [f for f in os.listdir(network_path) if f.startswith(file_name)]
                 if not target_file_list:
                     raise FileNotFoundError
                 for i, network_file in enumerate(target_file_list):
                     self._sliced_load(network_file, network_path=network_path)
-                    self.print_info("SlicedLoaded ({}/{})".format(i+1, len(target_file_list)), network_file, "green")
+                    self.print_info("{} ({}/{})".format(file_name, i+1, len(target_file_list)), network_file, "green")
             else:
                 self._sliced_load(file_name, network_path=network_path)
             self.print_info('Loaded', file_name, 'green')

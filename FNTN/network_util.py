@@ -51,7 +51,7 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             config_file_path, len(self.user_set), 'with' if 'ROOT' in user_set else 'without',
         ), 'green'))
 
-    def _dump_user_network(self, file_name: str = None):
+    def _dump_user_network(self, file_name: str = None, file_slice: int = 11, network_path=None, is_sliced=False):
         user_network_for_dumping = UserNetwork(
             self.user_id_to_follower_ids,
             self.user_id_to_friend_ids,
@@ -59,38 +59,42 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
             self.error_user_set,
             self.dump_file_id,
         )
-        user_network_for_dumping.dump(file_name)
+        user_network_for_dumping.dump(file_name, file_slice=file_slice, network_path=network_path, is_sliced=is_sliced)
         return user_network_for_dumping
 
-    def _load_user_network(self, file_name: str = None):
+    def _load_user_network(self, file_name: str = None, network_path=None, is_sliced=False):
         time.sleep(0.5)
         loaded_user_network = UserNetwork()
-        if loaded_user_network.load(file_name):
+        if loaded_user_network.load(file_name, network_path=network_path, is_sliced=is_sliced):
             # DO NOT Load 'dump_file_id' and 'user_set'.
             self.user_id_to_friend_ids = loaded_user_network.user_id_to_friend_ids
             self.user_id_to_follower_ids = loaded_user_network.user_id_to_follower_ids
             self.error_user_set = loaded_user_network.error_user_set
 
-    def get_and_dump_user_network(self, file_name: str = None, with_load=True, save_point=10):
+    def get_and_dump_user_network(self, file_name: str = None, with_load=True, save_point=10,
+                                  file_slice: int = 11, network_path=None, is_sliced=False):
         first_wait = 5
         print('Just called get_and_dump_user_network(), which is a really heavy method.\n',
               'This will start after {0}s.'.format(first_wait))
         wait_second(first_wait)
 
         if with_load:
-            self._load_user_network(file_name)
+            self._load_user_network(file_name, network_path=network_path, is_sliced=is_sliced)
 
         if self.what_to_crawl == "follower":
-            self.get_user_id_to_follower_ids(file_name, save_point)
+            self.get_user_id_to_follower_ids(file_name, save_point,
+                                             file_slice=file_slice, network_path=network_path, is_sliced=is_sliced)
         elif self.what_to_crawl == "friend":
-            self.get_user_id_to_friend_ids(file_name, save_point)
+            self.get_user_id_to_friend_ids(file_name, save_point,
+                                           file_slice=file_slice, network_path=network_path, is_sliced=is_sliced)
 
         time.sleep(1)
-        r = self._dump_user_network(file_name)
+        r = self._dump_user_network(file_name, file_slice=file_slice, network_path=network_path, is_sliced=is_sliced)
         self.backup(max(len(self.user_id_to_follower_ids), len(self.user_id_to_friend_ids)), len(self.error_user_set))
         return r
 
-    def get_user_id_to_target_ids(self, file_name, user_id_to_target_ids, fetch_target_ids, save_point=10):
+    def get_user_id_to_target_ids(self, file_name, user_id_to_target_ids, fetch_target_ids, save_point=10,
+                                  file_slice: int = 11, network_path=None, is_sliced=False):
 
         user_list_need_crawling = None
         if self.what_to_crawl == "follower":
@@ -116,14 +120,21 @@ class UserNetworkAPIWrapper(TwitterAPIWrapper):
                         self.error_user_set.add(user_id)
 
             if (i + 1) % save_point == 0:
-                self._dump_user_network(file_name)
+                self._dump_user_network(
+                    file_name,
+                    file_slice=file_slice, network_path=network_path, is_sliced=is_sliced
+                )
                 print('{0} | {1}/{2} finished.'.format(os.getpid(), i + 1, len_user_set))
 
-    def get_user_id_to_follower_ids(self, file_name, save_point=10):
-        self.get_user_id_to_target_ids(file_name, self.user_id_to_follower_ids, self._fetch_follower_ids, save_point)
+    def get_user_id_to_follower_ids(self, file_name, save_point=10,
+                                    file_slice: int = 11, network_path=None, is_sliced=False):
+        self.get_user_id_to_target_ids(file_name, self.user_id_to_follower_ids, self._fetch_follower_ids, save_point,
+                                       file_slice=file_slice, network_path=network_path, is_sliced=is_sliced)
 
-    def get_user_id_to_friend_ids(self, file_name, save_point=10):
-        self.get_user_id_to_target_ids(file_name, self.user_id_to_friend_ids, self._fetch_friend_ids, save_point)
+    def get_user_id_to_friend_ids(self, file_name, save_point=10,
+                                  file_slice: int = 11, network_path=None, is_sliced=False):
+        self.get_user_id_to_target_ids(file_name, self.user_id_to_friend_ids, self._fetch_friend_ids, save_point,
+                                       file_slice=file_slice, network_path=network_path, is_sliced=is_sliced)
 
     def paged_to_all(self, user_id, paged_func) -> list:
 
@@ -325,15 +336,16 @@ def prune_networks(network_list: List[UserNetwork]) -> UserNetwork:
     return network_to_prune
 
 
-def fill_adjacency_from_events(base_network: UserNetwork):
-    event_file_name = "FormattedEventNotIndexify.pkl"
+def fill_adjacency_from_events(base_network: UserNetwork, event_file_name=None, is_dump=False):
+    event_file_name = event_file_name or "FormattedEvent_with_leaves.pkl"
     events = get_formatted_events(
         get_formatted_stories().tweet_id_to_story_id,
         event_file_name=event_file_name,
         force_save=False,
         indexify=False,
     )
-    events.dump(event_file_name)
+    if is_dump:
+        events.dump(event_file_name)
 
     for parent, children in events.parent_to_children.items():
         # By nature, children must follow parent
@@ -359,7 +371,7 @@ def fill_adjacency_from_events(base_network: UserNetwork):
 
 if __name__ == '__main__':
 
-    MODE = 'NETWORKX'
+    MODE = 'ELSE'
     what_to_crawl_in_main = "pruned"
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -414,7 +426,8 @@ if __name__ == '__main__':
             None,  # SlicedUserNetworks for followers
             "UserNetwork_friends.pkl",
             "UserNetwork_friends_leaves.pkl",
-            "UserNetwork_followers_leaves.pkl",
+            "UserNetwork_followers_leaves_0.pkl",
+            "UserNetwork_followers_leaves_1.pkl",
         ]
         user_network_instances = []
         for net_file_name in network_files:
@@ -426,12 +439,12 @@ if __name__ == '__main__':
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":
         user_network = UserNetwork()
-        user_network.load(file_name=main_file_name)
+        user_network.load(file_name="PrunedUserNetwork.pkl")
         result_network = fill_adjacency_from_events(user_network)
         result_network.dump("FilledPrunedUserNetwork.pkl")
 
     elif MODE == "NETWORKX":
-        user_networkx = get_user_networkx(user_network_file=main_file_name)
+        user_networkx = get_user_networkx(user_network_file=main_file_name, networkx_file="UserNetworkX_w.gpickle")
         print("Total {} nodes".format(user_networkx.number_of_nodes()))
         print("Total {} edges".format(user_networkx.number_of_edges()))
 
