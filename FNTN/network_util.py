@@ -284,9 +284,10 @@ class UserNetworkChecker:
         _user_network_api.get_and_dump_user_network(file_name=file_name, with_load=False, save_point=save_point)
 
 
-def prune_networks(network_list: List[UserNetwork]) -> UserNetwork:
+def prune_networks(network_list: List[UserNetwork], aux_user_set=None) -> UserNetwork:
     """
     :param network_list: list of UserNetwork
+    :param aux_user_set: auxiliary uer set
     :return: UserNetwork that users who are not in keys of UserNetwork are removed
     """
     real_user_set = set()
@@ -295,6 +296,10 @@ def prune_networks(network_list: List[UserNetwork]) -> UserNetwork:
         real_user_set.update(net.user_id_to_follower_ids.keys())
     real_user_set = {int(u) for u in real_user_set}
     cprint("Load user_set: {}".format(len(real_user_set)), "green")
+
+    if aux_user_set:
+        real_user_set.update({int(u) for u in aux_user_set})
+        cprint("Update aux_user_set: {}, now real_user_set: {}".format(len(aux_user_set), len(real_user_set)), "green")
 
     network_to_prune = UserNetwork()
     error_user_set = set()
@@ -371,7 +376,7 @@ def fill_adjacency_from_events(base_network: UserNetwork, event_file_name=None, 
 
 if __name__ == '__main__':
 
-    MODE = 'ELSE'
+    MODE = 'PRUNE_NETWORKS'
     what_to_crawl_in_main = "pruned"
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -434,8 +439,17 @@ if __name__ == '__main__':
             user_network = UserNetwork()
             user_network.load(file_name=net_file_name)
             user_network_instances.append(user_network)
-        pruned_network = prune_networks(user_network_instances)
-        pruned_network.dump("PrunedUserNetwork.pkl")
+
+        aux_user_size = 4
+        aux_user_set_candidates = {
+            4: "sampled_not_propagated_user_set_42_1448928_0.pkl",
+            9: "sampled_not_propagated_user_set_42_3260088_0.pkl",
+            49: "sampled_not_propagated_user_set_42_17749368_0.pkl",
+            99: "sampled_not_propagated_user_set_42_35860968_0.pkl",
+        }
+        aux_user_set = load_user_set(aux_user_set_candidates[aux_user_size])
+        pruned_network = prune_networks(user_network_instances, aux_user_set=aux_user_set)
+        pruned_network.dump("PrunedUserNetwork_{}.pkl".format(aux_user_size))
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":
         user_network = UserNetwork()
