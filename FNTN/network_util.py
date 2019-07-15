@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from FNTN.network import get_user_networkx
+from FNTN.network import get_or_create_user_networkx
 
 __author__ = 'Dongkwan Kim'
 
@@ -376,7 +376,7 @@ def fill_adjacency_from_events(base_network: UserNetwork, event_file_name=None, 
 
 if __name__ == '__main__':
 
-    MODE = 'PRUNE_NETWORKS'
+    MODE = 'NETWORKX'
     what_to_crawl_in_main = "pruned"
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -434,31 +434,31 @@ if __name__ == '__main__':
             "UserNetwork_followers_leaves_0.pkl",
             "UserNetwork_followers_leaves_1.pkl",
         ]
+        aux_network_files = [
+            "UserNetwork_follower_aux_{}.pkl".format(i) for i in range(6)
+        ] + [
+            "UserNetwork_friend_aux_{}.pkl".format(i) for i in range(3)
+        ]
         user_network_instances = []
-        for net_file_name in network_files:
+        for net_file_name in (network_files + aux_network_files):
             user_network = UserNetwork()
             user_network.load(file_name=net_file_name)
             user_network_instances.append(user_network)
 
-        aux_user_size = 4
-        aux_user_set_candidates = {
-            4: "sampled_not_propagated_user_set_42_1448928_0.pkl",
-            9: "sampled_not_propagated_user_set_42_3260088_0.pkl",
-            49: "sampled_not_propagated_user_set_42_17749368_0.pkl",
-            99: "sampled_not_propagated_user_set_42_35860968_0.pkl",
-        }
-        aux_user_set = load_user_set(aux_user_set_candidates[aux_user_size])
-        pruned_network = prune_networks(user_network_instances, aux_user_set=aux_user_set)
-        pruned_network.dump("PrunedUserNetwork_{}.pkl".format(aux_user_size))
+        pruned_network = prune_networks(user_network_instances)
+        pruned_network.dump("PrunedUserNetwork_with_aux.pkl")
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":
         user_network = UserNetwork()
-        user_network.load(file_name="PrunedUserNetwork.pkl")
+        user_network.load(file_name="PrunedUserNetwork_with_aux.pkl")
         result_network = fill_adjacency_from_events(user_network)
-        result_network.dump("FilledPrunedUserNetwork.pkl")
+        result_network.dump("FilledPrunedUserNetwork_with_aux.pkl")
 
     elif MODE == "NETWORKX":
-        user_networkx = get_user_networkx(user_network_file=main_file_name, networkx_file="UserNetworkX_w.gpickle")
+        user_networkx = get_or_create_user_networkx(
+            user_network_file="FilledPrunedUserNetwork_with_aux.pkl",
+            networkx_file="UserNetworkX_with_aux.gpickle",
+        )
         print("Total {} nodes".format(user_networkx.number_of_nodes()))
         print("Total {} edges".format(user_networkx.number_of_edges()))
 

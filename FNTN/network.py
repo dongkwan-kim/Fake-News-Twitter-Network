@@ -123,7 +123,7 @@ class UserNetwork:
         return g
 
 
-def get_user_networkx(user_network_file=None, networkx_file=None, path=None):
+def get_or_create_user_networkx(user_network_file=None, networkx_file=None, path=None):
     path = path or NETWORK_PATH
     networkx_file = networkx_file or "UserNetworkX.gpickle"
     networkx_path_and_file = os.path.join(path, networkx_file)
