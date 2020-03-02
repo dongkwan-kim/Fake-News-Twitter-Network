@@ -376,7 +376,7 @@ def fill_adjacency_from_events(base_network: UserNetwork, event_file_name=None, 
 
 if __name__ == '__main__':
 
-    MODE = 'NETWORKX'
+    MODE = 'PRUNE_NETWORKS'
     what_to_crawl_in_main = "pruned"
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -418,7 +418,7 @@ if __name__ == '__main__':
         )
         user_network_api.get_and_dump_user_network(file_name=main_file_name, save_point=1000)
 
-    elif MODE == "CHECK_AND_REFILL":
+    elif MODE == "CHECK_AND_REFILL":  # Check and restore false-error users.
         given_config_file_path_list = [os.path.join('FNTN', 'config', f) for f in os.listdir('./FNTN/config') if '.ini' in f]
         checker = UserNetworkChecker(
             config_file_path_list=given_config_file_path_list,
@@ -426,7 +426,8 @@ if __name__ == '__main__':
         )
         checker.refill_unexpected_error_users(file_name=main_file_name, save_point=1000)
 
-    elif MODE == "PRUNE_NETWORKS":
+    elif MODE == "PRUNE_NETWORKS":  # Remove users who do not participate in the propagation.
+        with_aux = False
         network_files = [
             None,  # SlicedUserNetworks for followers
             "UserNetwork_friends.pkl",
@@ -434,30 +435,33 @@ if __name__ == '__main__':
             "UserNetwork_followers_leaves_0.pkl",
             "UserNetwork_followers_leaves_1.pkl",
         ]
-        aux_network_files = [
-            "UserNetwork_follower_aux_{}.pkl".format(i) for i in range(6)
-        ] + [
-            "UserNetwork_friend_aux_{}.pkl".format(i) for i in range(3)
-        ]
+
+        if with_aux:
+            aux_network_files = ["UserNetwork_follower_aux_{}.pkl".format(i) for i in range(6)] + \
+                                ["UserNetwork_friend_aux_{}.pkl".format(i) for i in range(3)]
+            network_files += aux_network_files
+
         user_network_instances = []
-        for net_file_name in (network_files + aux_network_files):
+        for net_file_name in network_files:
             user_network = UserNetwork()
             user_network.load(file_name=net_file_name)
             user_network_instances.append(user_network)
 
         pruned_network = prune_networks(user_network_instances)
-        pruned_network.dump("PrunedUserNetwork_with_aux.pkl")
+        pruned_network.dump("PrunedUserNetwork_{}_aux.pkl".format("with" if with_aux else "without"))
 
-    elif MODE == "FILL_ADJ_FROM_EVENTS":
+    elif MODE == "FILL_ADJ_FROM_EVENTS":  # Add following/follower in the propagation.
         user_network = UserNetwork()
         user_network.load(file_name="PrunedUserNetwork_with_aux.pkl")
         result_network = fill_adjacency_from_events(user_network)
         result_network.dump("FilledPrunedUserNetwork_with_aux.pkl")
 
-    elif MODE == "NETWORKX":
+    elif MODE == "NETWORKX":  # Dump to networkx format.
+        with_aux = False
+        aux_prefix = "with" if with_aux else "without"
         user_networkx = get_or_create_user_networkx(
-            user_network_file="FilledPrunedUserNetwork_with_aux.pkl",
-            networkx_file="UserNetworkX_with_aux.gpickle",
+            user_network_file="FilledPrunedUserNetwork_{}_aux.pkl".format(aux_prefix),
+            networkx_file="UserNetworkX_{}_aux.gpickle".format(aux_prefix),
         )
         print("Total {} nodes".format(user_networkx.number_of_nodes()))
         print("Total {} edges".format(user_networkx.number_of_edges()))
