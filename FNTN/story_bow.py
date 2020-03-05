@@ -11,10 +11,7 @@ from pprint import pprint
 
 from FNTN.story_feature import get_story_files
 
-try:
-    from orderedset import OrderedSet
-except:
-    pass
+from ordered_set import OrderedSet
 
 DATA_PATH = os.path.dirname(os.path.abspath(__file__))
 STORY_PATH = os.path.join(DATA_PATH, 'data_story')
