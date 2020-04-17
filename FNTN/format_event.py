@@ -214,14 +214,23 @@ if __name__ == '__main__':
 
     from FNTN.story_bow import get_formatted_stories, BOWStory, BOWStoryElement
 
+    MODE = "TEST"
     event_file_name_main = "FormattedEvent_with_leaves.pkl"
 
-    stories = get_formatted_stories()
-    formatted_events = get_formatted_events(
-        stories.tweet_id_to_story_id,
-        event_file_name=event_file_name_main,
-        force_save=True,
-        indexify=False,
-        remove_leaves=False,
-    )
-    formatted_events.dump(event_file_name_main)
+    if MODE == "DUMP":
+        stories = get_formatted_stories()
+        formatted_events = get_formatted_events(
+            stories.tweet_id_to_story_id,
+            event_file_name=event_file_name_main,
+            force_save=True,
+            indexify=False,
+            remove_leaves=False,
+        )
+        formatted_events.dump(event_file_name_main)
+    else:
+        formatted_stories = get_formatted_stories()
+        formatted_events = get_formatted_events(
+            tweet_id_to_story_id=formatted_stories.tweet_id_to_story_id,
+            event_file_name=event_file_name_main,
+        )
+        print(len(formatted_events.user_to_id))
