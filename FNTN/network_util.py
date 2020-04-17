@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 from FNTN.network import get_or_create_user_networkx
-
-__author__ = 'Dongkwan Kim'
-
 from FNTN.TwitterAPIWrapper import TwitterAPIWrapper, is_account_public_for_one
 from FNTN.story_bow import *
 from FNTN.format_event import *
@@ -12,6 +9,7 @@ from termcolor import colored, cprint
 from typing import List, Dict
 import os
 import shutil
+from collections import Counter
 import time
 import networkx as nx
 
@@ -284,18 +282,45 @@ class UserNetworkChecker:
         _user_network_api.get_and_dump_user_network(file_name=file_name, with_load=False, save_point=save_point)
 
 
-def prune_networks(network_list: List[UserNetwork], aux_user_set=None) -> UserNetwork:
+def prune_networks(network_list: List[UserNetwork], aux_user_set=None,
+                   pruning_ratio=1.0) -> UserNetwork:
     """
     :param network_list: list of UserNetwork
     :param aux_user_set: auxiliary uer set
-    :return: UserNetwork that users who are not in keys of UserNetwork are removed
+    :param pruning_ratio: the ratio of users to prune (>0.0 and <=1.0)
+        - e.g., if pr = 1.0: Prune all except users who are keys of UserNetwork (participated in the propagation).
+
+    :return: UserNetwork pruned with level.
     """
+    # All users who participated in the propagation
     real_user_set = set()
+
+    # All users in the network allowing duplicates.
+    total_user_counter = Counter()
+
+    cprint("Loading user set from {} networks".format(len(network_list)), "green")
     for net in network_list:
         real_user_set.update(net.user_id_to_friend_ids.keys())
         real_user_set.update(net.user_id_to_follower_ids.keys())
+
+        for followers in tqdm(net.user_id_to_follower_ids.values(), total=len(net.user_id_to_follower_ids)):
+            if followers:
+                total_user_counter.update(followers)
+        for friends in tqdm(net.user_id_to_friend_ids.values(), total=len(net.user_id_to_friend_ids)):
+            if friends:
+                total_user_counter.update(friends)
+
     real_user_set = {int(u) for u in real_user_set}
-    cprint("Load user_set: {}".format(len(real_user_set)), "green")
+
+    pruned_total_user_set = {int(u) for u, cnt in total_user_counter.most_common(
+        int(len(total_user_counter) * (1 - pruning_ratio)))}
+
+    cprint("Load real_user_set: {}".format(len(real_user_set)), "green")
+    cprint("Load pruned_total_user_set: {} from {}".format(len(pruned_total_user_set),
+                                                           len(total_user_counter)), "green")
+
+    if len(pruned_total_user_set) > 0:
+        real_user_set.update(pruned_total_user_set)
 
     if aux_user_set:
         real_user_set.update({int(u) for u in aux_user_set})
@@ -303,10 +328,12 @@ def prune_networks(network_list: List[UserNetwork], aux_user_set=None) -> UserNe
 
     network_to_prune = UserNetwork()
     error_user_set = set()
+
+    cprint("Pruning users from {} networks".format(len(network_list)), "green")
     for net in network_list:
 
-        for i, (user_with_friend, friends) in enumerate(net.user_id_to_friend_ids.items()):
-
+        for i, (user_with_friend, friends) in enumerate(tqdm(net.user_id_to_friend_ids.items(),
+                                                             total=len(net.user_id_to_friend_ids))):
             user_with_friend = int(user_with_friend)
 
             if friends is None:
@@ -317,11 +344,8 @@ def prune_networks(network_list: List[UserNetwork], aux_user_set=None) -> UserNe
 
             network_to_prune.user_id_to_friend_ids[user_with_friend] = pruned_friends
 
-            if (i+1) % 10000 == 0:
-                print("Friend Progress: {}".format(i+1))
-
-        for i, (user_with_follower, followers) in enumerate(net.user_id_to_follower_ids.items()):
-
+        for i, (user_with_follower, followers) in enumerate(tqdm(net.user_id_to_follower_ids.items(),
+                                                                 total=len(net.user_id_to_follower_ids))):
             user_with_follower = int(user_with_follower)
 
             if followers is None:
@@ -331,9 +355,6 @@ def prune_networks(network_list: List[UserNetwork], aux_user_set=None) -> UserNe
                 pruned_followers = [f for f in followers if f in real_user_set]
 
             network_to_prune.user_id_to_follower_ids[user_with_follower] = pruned_followers
-
-            if (i+1) % 10000 == 0:
-                print("Follower Progress: {}".format(i+1))
 
     network_to_prune.user_set = real_user_set
     network_to_prune.error_user_set = error_user_set
@@ -378,12 +399,17 @@ if __name__ == '__main__':
 
     MODE = 'PRUNE_NETWORKS'
     what_to_crawl_in_main = "pruned"
+
+    with_aux = False
+    aux_postfix = "with" if with_aux else "without"
+    user_pruning_ratio = 0.9
+
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
     elif what_to_crawl_in_main == "follower":
         main_file_name = None
     else:
-        main_file_name = "FilledPrunedUserNetwork.pkl"
+        main_file_name = "FilledPrunedUserNetwork_without_aux.pkl"
 
     start_time = time.time()
 
@@ -410,7 +436,8 @@ if __name__ == '__main__':
         user_network_api.get_and_dump_user_network()
 
     elif MODE == 'MP_API_RUN_V2':
-        given_config_file_path_list = [os.path.join('FNTN', 'config', f) for f in os.listdir('./FNTN/config') if '.ini' in f]
+        given_config_file_path_list = [os.path.join('FNTN', 'config', f) for f in os.listdir('./FNTN/config') if
+                                       '.ini' in f]
         user_network_api = UserNetworkAPIWrapper(
             config_file_path=given_config_file_path_list,
             user_set=user_set_from_fe,
@@ -427,9 +454,16 @@ if __name__ == '__main__':
         )
         checker.refill_unexpected_error_users(file_name=main_file_name, save_point=1000)
 
+    elif MODE == "PRUNE_NETWORKS_TEST":
+        user_network = UserNetwork()
+        user_network.load(file_name="UserNetwork_friends.pkl")  # SlicedUserNetwork_1.pkl
+        pruned_network = prune_networks([user_network], pruning_ratio=user_pruning_ratio)
+        print('Total {0} crawled users.'.format(pruned_network.get_num_of_crawled_users()))
+        print('Total {0} users in network'.format(len(pruned_network.user_set)))
+        print('Total {0} error users.'.format(len(pruned_network.error_user_set)))
+
     elif MODE == "PRUNE_NETWORKS":  # Remove users who do not participate in the propagation.
-        with_aux = False
-        aux_postfix = "with" if with_aux else "without"
+
         network_files = [
             None,  # SlicedUserNetworks for followers
             "UserNetwork_friends.pkl",
@@ -450,22 +484,30 @@ if __name__ == '__main__':
             user_network_instances.append(user_network)
 
         pruned_network = prune_networks(user_network_instances)
-        pruned_network.dump("PrunedUserNetwork_{}_aux.pkl".format(aux_postfix))
+        pruned_network.dump("PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+            aux_postfix, user_pruning_ratio,
+        ))
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":  # Add following/follower in the propagation.
-        with_aux = False
-        aux_postfix = "with" if with_aux else "without"
         user_network = UserNetwork()
-        user_network.load(file_name="PrunedUserNetwork_{}_aux.pkl".format(aux_postfix))
+        user_network.load(file_name="PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+            aux_postfix, user_pruning_ratio,
+        ))
         result_network = fill_adjacency_from_events(user_network)
-        result_network.dump("FilledPrunedUserNetwork_{}_aux.pkl".format(aux_postfix))
+        result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+            aux_postfix, user_pruning_ratio,
+        ))
 
     elif MODE == "NETWORKX":  # Dump to networkx format.
         with_aux = False
         aux_postfix = "with" if with_aux else "without"
         user_networkx = get_or_create_user_networkx(
-            user_network_file="FilledPrunedUserNetwork_{}_aux.pkl".format(aux_postfix),
-            networkx_file="UserNetworkX_{}_aux.gpickle".format(aux_postfix),
+            user_network_file="FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+                aux_postfix, user_pruning_ratio,
+            ),
+            networkx_file="UserNetworkX_{}_aux_pruning_{}.gpickle".format(
+                aux_postfix, user_pruning_ratio,
+            ),
         )
         print("Total {} nodes".format(user_networkx.number_of_nodes()))
         print("Total {} edges".format(user_networkx.number_of_edges()))
@@ -473,7 +515,8 @@ if __name__ == '__main__':
     else:
         user_network = UserNetwork()
         user_network.load(file_name=main_file_name)
-        print('Total {0} users.'.format(user_network.get_num_of_crawled_users()))
+        print('Total {0} crawled users.'.format(user_network.get_num_of_crawled_users()))
+        print('Total {0} users in network'.format(len(user_network.user_set)))
         print('Total {0} error users.'.format(len(user_network.error_user_set)))
 
     total_consumed_secs = time.time() - start_time
