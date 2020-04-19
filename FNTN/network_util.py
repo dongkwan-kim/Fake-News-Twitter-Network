@@ -312,9 +312,18 @@ def prune_networks(network_list: List[UserNetwork], aux_user_set=None,
 
     real_user_set = {int(u) for u in real_user_set}
 
-    pruned_total_user_set = {int(u) for u, cnt in total_user_counter.most_common(
-        int(len(total_user_counter) * (1 - pruning_ratio)))}
+    num_remained_users = int(len(total_user_counter) * (1 - pruning_ratio))
+    print("num_remained_users: {}".format(num_remained_users))
 
+    most_common_user_and_count = total_user_counter.most_common(num_remained_users)
+    count_array = np.asarray(most_common_user_and_count).transpose()[1]
+    print("Smallest count: {}".format(count_array[-1]))
+    print("Largest count: {}".format(count_array[0]))
+    print("Mean count: {}".format(float(np.mean(count_array))))
+    print("Stdev count: {}".format(float(np.std(count_array))))
+    print("Median count: {}".format(float(np.median(count_array))))
+
+    pruned_total_user_set = {int(u) for u, cnt in most_common_user_and_count}
     cprint("Load real_user_set: {}".format(len(real_user_set)), "green")
     cprint("Load pruned_total_user_set: {} from {}".format(len(pruned_total_user_set),
                                                            len(total_user_counter)), "green")
@@ -402,7 +411,7 @@ if __name__ == '__main__':
 
     with_aux = False
     aux_postfix = "with" if with_aux else "without"
-    user_pruning_ratio = 0.9
+    user_pruning_ratio = 0.95
 
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -455,6 +464,7 @@ if __name__ == '__main__':
         checker.refill_unexpected_error_users(file_name=main_file_name, save_point=1000)
 
     elif MODE == "PRUNE_NETWORKS_TEST":
+        print("PRUNE_NETWORKS_TEST: pruning ratio of {}".format(user_pruning_ratio))
         user_network = UserNetwork()
         user_network.load(file_name="UserNetwork_friends.pkl")  # SlicedUserNetwork_1.pkl
         pruned_network = prune_networks([user_network], pruning_ratio=user_pruning_ratio)
@@ -463,6 +473,8 @@ if __name__ == '__main__':
         print('Total {0} error users.'.format(len(pruned_network.error_user_set)))
 
     elif MODE == "PRUNE_NETWORKS":  # Remove users who do not participate in the propagation.
+
+        print("PRUNE_NETWORKS: pruning ratio of {}".format(user_pruning_ratio))
 
         network_files = [
             None,  # SlicedUserNetworks for followers
@@ -483,10 +495,13 @@ if __name__ == '__main__':
             user_network.load(file_name=net_file_name)
             user_network_instances.append(user_network)
 
-        pruned_network = prune_networks(user_network_instances)
+        pruned_network = prune_networks(user_network_instances, pruning_ratio=user_pruning_ratio)
         pruned_network.dump("PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
             aux_postfix, user_pruning_ratio,
         ))
+        print('Total {0} crawled users.'.format(pruned_network.get_num_of_crawled_users()))
+        print('Total {0} users in network'.format(len(pruned_network.user_set)))
+        print('Total {0} error users.'.format(len(pruned_network.error_user_set)))
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":  # Add following/follower in the propagation.
         user_network = UserNetwork()
@@ -499,8 +514,6 @@ if __name__ == '__main__':
         ))
 
     elif MODE == "NETWORKX":  # Dump to networkx format.
-        with_aux = False
-        aux_postfix = "with" if with_aux else "without"
         user_networkx = get_or_create_user_networkx(
             user_network_file="FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
                 aux_postfix, user_pruning_ratio,
