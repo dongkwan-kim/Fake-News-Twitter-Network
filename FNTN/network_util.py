@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from FNTN.network import get_or_create_user_networkx
-from FNTN.TwitterAPIWrapper import TwitterAPIWrapper, is_account_public_for_one
-from FNTN.story_bow import *
-from FNTN.format_event import *
-from FNTN.user_set import *
-from FNTN.utill import *
+from network import get_or_create_user_networkx
+from TwitterAPIWrapper import TwitterAPIWrapper, is_account_public_for_one
+from story_bow import *
+from format_event import *
+from user_set import *
+from utill import *
 from termcolor import colored, cprint
 from typing import List, Dict
 import os

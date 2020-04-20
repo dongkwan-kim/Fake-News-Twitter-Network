@@ -212,7 +212,7 @@ def get_formatted_events(tweet_id_to_story_id=None, event_file_name=None, event_
 
 if __name__ == '__main__':
 
-    from FNTN.story_bow import get_formatted_stories, BOWStory, BOWStoryElement
+    from story_bow import get_formatted_stories, BOWStory, BOWStoryElement
 
     MODE = "TEST"
     event_file_name_main = "FormattedEvent_with_leaves.pkl"

@@ -9,7 +9,7 @@ from copy import deepcopy
 import random
 from pprint import pprint
 
-from FNTN.story_feature import get_story_files
+from story_feature import get_story_files
 
 from ordered_set import OrderedSet
 

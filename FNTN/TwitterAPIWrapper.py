@@ -6,7 +6,7 @@ from typing import List, Tuple
 import twitter
 import configparser
 
-from FNTN.utill import wait_second
+from utill import wait_second
 
 
 class TwitterAPIWrapper:

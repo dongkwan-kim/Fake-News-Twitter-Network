@@ -6,7 +6,7 @@ import numpy as np
 
 from termcolor import cprint
 
-from FNTN.network import UserNetwork, NETWORK_PATH
+from network import UserNetwork, NETWORK_PATH
 
 SIZE_LIMIT = 10000 * 10000
 USER_SET_PATH = os.path.join(NETWORK_PATH, "user_set")

@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-
-__author__ = 'Dongkwan Kim'
-
 from termcolor import colored, cprint
-from FNTN.utill import *
+from utill import *
 import os
 import pickle
 import networkx as nx

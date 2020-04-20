@@ -5,10 +5,13 @@ import urllib.request
 import sys
 import csv
 import datetime
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 from typing import List
 from copy import deepcopy
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:
+    pass
 
 
 def build_hist(enumerable, title, config):
