@@ -411,7 +411,7 @@ if __name__ == '__main__':
 
     with_aux = False
     aux_postfix = "with" if with_aux else "without"
-    user_pruning_ratio = 0.95
+    user_pruning_ratio = 0.999
 
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -505,13 +505,18 @@ if __name__ == '__main__':
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":  # Add following/follower in the propagation.
         user_network = UserNetwork()
-        user_network.load(file_name="PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-            aux_postfix, user_pruning_ratio,
-        ))
-        result_network = fill_adjacency_from_events(user_network)
-        result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-            aux_postfix, user_pruning_ratio,
-        ))
+        for _upr in [0.8, 0.9, 0.95, 0.99, 0.995, 0.999]:
+            print("FILL_ADJ_FROM_EVENTS: pruning_ratio of {}".format(_upr))
+            try:
+                user_network.load(file_name="PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+                    aux_postfix, _upr,
+                ))
+                result_network = fill_adjacency_from_events(user_network)
+                result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+                    aux_postfix, _upr,
+                ))
+            except Exception as e:
+                print("Exception (pruning_ratio of {}): {}".format(_upr, str(e)))
 
     elif MODE == "NETWORKX":  # Dump to networkx format.
         user_networkx = get_or_create_user_networkx(
