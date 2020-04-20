@@ -316,12 +316,9 @@ def prune_networks(network_list: List[UserNetwork], aux_user_set=None,
     print("num_remained_users: {}".format(num_remained_users))
 
     most_common_user_and_count = total_user_counter.most_common(num_remained_users)
-    count_array = np.asarray(most_common_user_and_count).transpose()[1]
-    print("Smallest count: {}".format(count_array[-1]))
-    print("Largest count: {}".format(count_array[0]))
-    print("Mean count: {}".format(float(np.mean(count_array))))
-    print("Stdev count: {}".format(float(np.std(count_array))))
-    print("Median count: {}".format(float(np.median(count_array))))
+    if num_remained_users > 0:
+        count_array = np.asarray(most_common_user_and_count).transpose()[1]
+        print_stats(count_array)
 
     pruned_total_user_set = {int(u) for u, cnt in most_common_user_and_count}
     cprint("Load real_user_set: {}".format(len(real_user_set)), "green")
@@ -382,7 +379,8 @@ def fill_adjacency_from_events(base_network: UserNetwork, event_file_name=None, 
     if is_dump:
         events.dump(event_file_name)
 
-    for parent, children in events.parent_to_children.items():
+    for parent, children in tqdm(events.parent_to_children.items(),
+                                 total=len(events.parent_to_children)):
         # By nature, children must follow parent
 
         if parent == "ROOT":
@@ -392,21 +390,45 @@ def fill_adjacency_from_events(base_network: UserNetwork, event_file_name=None, 
         for child in children:
             if base_network.user_id_to_friend_ids[child] is None:
                 base_network.user_id_to_friend_ids[child] = []
+            if base_network.user_id_to_follower_ids[child] is None:  # Remove None
+                base_network.user_id_to_follower_ids[child] = []
             friends_of_child = base_network.user_id_to_friend_ids[child] + [parent]
             base_network.user_id_to_friend_ids[child] = list(set(friends_of_child))
 
         # == children are followers of parent
         if base_network.user_id_to_follower_ids[parent] is None:
             base_network.user_id_to_follower_ids[parent] = []
+        if base_network.user_id_to_friend_ids[parent] is None:  # Remove None
+            base_network.user_id_to_friend_ids[parent] = []
         followers_of_parent = base_network.user_id_to_follower_ids[parent] + children
         base_network.user_id_to_follower_ids[parent] = list(set(followers_of_parent))
 
     return base_network
 
 
+def check_correctness(net: UserNetwork):
+    error_list = []
+    for user, followers in net.user_id_to_follower_ids.items():
+        if followers is None:
+            error_list.append(user)
+    for user, friends in net.user_id_to_friend_ids.items():
+        if friends is None:
+            error_list.append(user)
+    print("Error: {}".format(len(error_list)))
+    return len(error_list) == 0
+
+
+def print_stats(array_1d):
+    print("Smallest: {}".format(array_1d[-1]))
+    print("Largest: {}".format(array_1d[0]))
+    print("Mean: {}".format(float(np.mean(array_1d))))
+    print("Stdev: {}".format(float(np.std(array_1d))))
+    print("Median: {}".format(float(np.median(array_1d))))
+
+
 if __name__ == '__main__':
 
-    MODE = 'PRUNE_NETWORKS'
+    MODE = 'FILL_ADJ_FROM_EVENTS'
     what_to_crawl_in_main = "pruned"
 
     with_aux = False
@@ -505,16 +527,19 @@ if __name__ == '__main__':
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":  # Add following/follower in the propagation.
         user_network = UserNetwork()
-        for _upr in [0.8, 0.9, 0.95, 0.99, 0.995, 0.999]:
+        for _upr in [0.9, 0.95, 0.99, 0.995, 0.999]:
             print("FILL_ADJ_FROM_EVENTS: pruning_ratio of {}".format(_upr))
             try:
                 user_network.load(file_name="PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
                     aux_postfix, _upr,
                 ))
                 result_network = fill_adjacency_from_events(user_network)
-                result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-                    aux_postfix, _upr,
-                ))
+
+                if check_correctness(result_network):
+                    result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+                        aux_postfix, _upr,
+                    ))
+
             except Exception as e:
                 print("Exception (pruning_ratio of {}): {}".format(_upr, str(e)))
 
