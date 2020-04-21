@@ -526,22 +526,18 @@ if __name__ == '__main__':
         print('Total {0} error users.'.format(len(pruned_network.error_user_set)))
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":  # Add following/follower in the propagation.
+        _upr = 0.9  # 0.9, 0.95, 0.99, 0.995, 0.999, 1.0
+        print("FILL_ADJ_FROM_EVENTS: pruning_ratio of {}".format(_upr))
         user_network = UserNetwork()
-        for _upr in [0.9, 0.95, 0.99, 0.995, 0.999]:
-            print("FILL_ADJ_FROM_EVENTS: pruning_ratio of {}".format(_upr))
-            try:
-                user_network.load(file_name="PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-                    aux_postfix, _upr,
-                ))
-                result_network = fill_adjacency_from_events(user_network)
+        user_network.load(file_name="PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+            aux_postfix, _upr,
+        ))
+        result_network = fill_adjacency_from_events(deepcopy(user_network))
 
-                if check_correctness(result_network):
-                    result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-                        aux_postfix, _upr,
-                    ))
-
-            except Exception as e:
-                print("Exception (pruning_ratio of {}): {}".format(_upr, str(e)))
+        if check_correctness(result_network):
+            result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+                aux_postfix, _upr,
+            ))
 
     elif MODE == "NETWORKX":  # Dump to networkx format.
         user_networkx = get_or_create_user_networkx(
