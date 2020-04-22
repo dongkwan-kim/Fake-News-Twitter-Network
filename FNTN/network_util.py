@@ -418,6 +418,62 @@ def check_correctness(net: UserNetwork):
     return len(error_list) == 0
 
 
+def coalesce_not_propagated_users(net: UserNetwork):
+    co_net = UserNetwork()
+    for user_with_friend, friends in tqdm(net.user_id_to_friend_ids.items(),
+                                          total=len(net.user_id_to_friend_ids)):
+
+        if user_with_friend not in co_net.user_id_to_friend_ids:
+            co_net.user_id_to_friend_ids[user_with_friend] = net.user_id_to_friend_ids[user_with_friend]
+        else:
+            co_net.user_id_to_friend_ids[user_with_friend] += net.user_id_to_friend_ids[user_with_friend]
+        if user_with_friend not in co_net.user_id_to_follower_ids:
+            co_net.user_id_to_follower_ids[user_with_friend] = []
+
+        for f in friends:
+            # f is a friend of user == user is a follower of f
+            if f not in co_net.user_id_to_follower_ids:
+                co_net.user_id_to_follower_ids[f] = [user_with_friend]
+            else:
+                co_net.user_id_to_follower_ids[f].append(user_with_friend)
+            if f not in co_net.user_id_to_friend_ids:
+                co_net.user_id_to_friend_ids[f] = []
+
+    for user_with_follower, followers in tqdm(net.user_id_to_follower_ids.items(),
+                                              total=len(net.user_id_to_follower_ids)):
+        if user_with_follower not in co_net.user_id_to_follower_ids:
+            co_net.user_id_to_follower_ids[user_with_follower] = net.user_id_to_follower_ids[user_with_follower]
+        else:
+            co_net.user_id_to_follower_ids[user_with_follower] += net.user_id_to_follower_ids[user_with_follower]
+        if user_with_follower not in co_net.user_id_to_friend_ids:
+            co_net.user_id_to_friend_ids[user_with_follower] = []
+
+        for f in followers:
+            # f is a follower of user == user is a friend of f
+            if f not in co_net.user_id_to_friend_ids:
+                co_net.user_id_to_friend_ids[f] = [user_with_follower]
+            else:
+                co_net.user_id_to_friend_ids[f].append(user_with_follower)
+            if f not in co_net.user_id_to_follower_ids:
+                co_net.user_id_to_follower_ids[f] = []
+
+    for user_with_friend, friends in tqdm(net.user_id_to_friend_ids.items(),
+                                          total=len(net.user_id_to_friend_ids)):
+        co_net.user_id_to_friend_ids[user_with_friend] = \
+            list(set(co_net.user_id_to_friend_ids[user_with_friend]))
+    for user_with_follower, followers in tqdm(net.user_id_to_follower_ids.items(),
+                                              total=len(net.user_id_to_follower_ids)):
+        co_net.user_id_to_follower_ids[user_with_follower] = \
+            list(set(co_net.user_id_to_follower_ids[user_with_follower]))
+
+    print("User set: {}, {} (should same)".format(len(co_net.user_id_to_friend_ids),
+                                                  len(co_net.user_id_to_follower_ids)))
+    assert len(co_net.user_id_to_friend_ids) == len(co_net.user_id_to_follower_ids)
+    co_net.user_set = set(co_net.user_id_to_friend_ids.keys())
+
+    return co_net
+
+
 def print_stats(array_1d):
     print("Smallest: {}".format(array_1d[-1]))
     print("Largest: {}".format(array_1d[0]))
@@ -428,7 +484,7 @@ def print_stats(array_1d):
 
 if __name__ == '__main__':
 
-    MODE = 'FILL_ADJ_FROM_EVENTS'
+    MODE = 'COALESCE_NOT_PROPAGATED_USERS'
     what_to_crawl_in_main = "pruned"
 
     with_aux = False
@@ -536,6 +592,22 @@ if __name__ == '__main__':
 
         if check_correctness(result_network):
             result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+                aux_postfix, _upr,
+            ))
+
+    elif MODE == "COALESCE_NOT_PROPAGATED_USERS":
+        _upr = 0.99  # 0.99, 0.995, 0.999, 1.0
+        print("COALESCE_NOT_PROPAGATED_USERS: pruning_ratio of {}".format(_upr))
+        user_network = UserNetwork()
+        user_network.load(file_name="FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
+            aux_postfix, _upr,
+        ))
+        if not check_correctness(user_network):
+            raise Exception("Correctness fail")
+
+        coalesce_network = coalesce_not_propagated_users(user_network)
+        if check_correctness(coalesce_network):
+            coalesce_network.dump("CoalescedFilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
                 aux_postfix, _upr,
             ))
 
