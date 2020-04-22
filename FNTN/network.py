@@ -104,16 +104,18 @@ class UserNetwork:
         g = nx.DiGraph()
 
         # u follows friends
-        for u, friends in self.user_id_to_friend_ids.items():
+        for u, friends in tqdm(self.user_id_to_friend_ids.items(),
+                               total=len(self.user_id_to_friend_ids)):
             if friends:
                 edges = [(u, f) for f in friends]
-                g.add_edges_from(edges, follow=1)
+                g.add_edges_from(edges)
 
         # followers follow u
-        for u, followers in self.user_id_to_follower_ids.items():
+        for u, followers in tqdm(self.user_id_to_follower_ids.items(),
+                                 total=len(self.user_id_to_follower_ids)):
             if followers:
                 edges = [(f, u) for f in followers]
-                g.add_edges_from(edges, follow=1)
+                g.add_edges_from(edges)
 
         g.add_nodes_from(self.user_set)
 
