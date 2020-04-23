@@ -85,15 +85,16 @@ def to_events_numpy(out_path):
 
 if __name__ == '__main__':
 
-    MODE = "wow"
+    MODE = "DUMP_NETWORK"
 
     aux_postfix = "without"
-    pruning_ratio = 0.995  # 0.995, 0.999, 1.0
+    pruning_ratio = 0.997  # 0.995, 0.999, 1.0
     network_name = "CoalescedFilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
         aux_postfix, pruning_ratio,
     )
 
     if MODE == "DUMP_NETWORK":
+        print("DUMP_NETWORK: {}".format(pruning_ratio))
         user_networkx = get_or_create_user_networkx(
             user_network_file=network_name,
             networkx_file="network_{}.gpickle".format(round(1 - pruning_ratio, 5)),

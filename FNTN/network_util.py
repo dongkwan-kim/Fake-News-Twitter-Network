@@ -489,7 +489,7 @@ if __name__ == '__main__':
 
     with_aux = False
     aux_postfix = "with" if with_aux else "without"
-    user_pruning_ratio = 0.999
+    user_pruning_ratio = 0.997
 
     if what_to_crawl_in_main == "friend":
         main_file_name = "UserNetwork_friends.pkl"
@@ -582,25 +582,23 @@ if __name__ == '__main__':
         print('Total {0} error users.'.format(len(pruned_network.error_user_set)))
 
     elif MODE == "FILL_ADJ_FROM_EVENTS":  # Add following/follower in the propagation.
-        _upr = 0.9  # 0.9, 0.95, 0.99, 0.995, 0.999, 1.0
-        print("FILL_ADJ_FROM_EVENTS: pruning_ratio of {}".format(_upr))
+        print("FILL_ADJ_FROM_EVENTS: pruning_ratio of {}".format(user_pruning_ratio))
         user_network = UserNetwork()
         user_network.load(file_name="PrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-            aux_postfix, _upr,
+            aux_postfix, user_pruning_ratio,
         ))
         result_network = fill_adjacency_from_events(deepcopy(user_network))
 
         if check_correctness(result_network):
             result_network.dump("FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-                aux_postfix, _upr,
+                aux_postfix, user_pruning_ratio,
             ))
 
     elif MODE == "COALESCE_NOT_PROPAGATED_USERS":
-        _upr = 0.99  # 0.99, 0.995, 0.999, 1.0
-        print("COALESCE_NOT_PROPAGATED_USERS: pruning_ratio of {}".format(_upr))
+        print("COALESCE_NOT_PROPAGATED_USERS: pruning_ratio of {}".format(user_pruning_ratio))
         user_network = UserNetwork()
         user_network.load(file_name="FilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-            aux_postfix, _upr,
+            aux_postfix, user_pruning_ratio,
         ))
         if not check_correctness(user_network):
             raise Exception("Correctness fail")
@@ -608,7 +606,7 @@ if __name__ == '__main__':
         coalesce_network = coalesce_not_propagated_users(user_network)
         if check_correctness(coalesce_network):
             coalesce_network.dump("CoalescedFilledPrunedUserNetwork_{}_aux_pruning_{}.pkl".format(
-                aux_postfix, _upr,
+                aux_postfix, user_pruning_ratio,
             ))
 
     elif MODE == "NETWORKX":  # Dump to networkx format.
